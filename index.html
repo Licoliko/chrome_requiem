@@ -118,6 +118,24 @@ const SMAPS=[
    "11111111111111111111111111111111111111111111111111111111111111111111111111111111",
    "11111111111111111111111111111111111111111111111111111111111111111111111111111111",
    "11111111111111111111111111111111111111111111111111111111111111111111111111111111"],
+  // Stage 4 — 中枢基地 (壁と天井のある閉鎖空間)
+  ["11111111111111111111111111111111111111111111111111111111111111111111111111111111",
+   "11000000000000001100000000000000110000000000000011000000000000001100000000000011",
+   "11000000000000001100000000000000110000000000000011000000000000001100000000000011",
+   "11002222000022221100222200002222110022220000222211002222000022221100222200002211",
+   "11000000000000001100000000000000110000000000000011000000000000001100000000000011",
+   "11000000000000001100000000000000110000000000000011000000000000001100000000000011",
+   "11222200002222001122220000222200112222000022220011222200002222001122220000222211",
+   "11000000000000001100000000000000110000000000000011000000000000001100000000000011",
+   "11000000000000001100000000000000110000000000000011000000000000001100000000000011",
+   "11002222000022221100222200002222110022220000222211002222000022221100222200002211",
+   "11000000000000001100000000000000110000000000000011000000000000001100000000000011",
+   "11000000000000001100000000000000110000000000000011000000000000001100000000000011",
+   "11111111000011111111111100001111111111110000111111111111000011111111111100001111",
+   "11111111111111111111111111111111111111111111111111111111111111111111111111111111",
+   "11111111111111111111111111111111111111111111111111111111111111111111111111111111",
+   "11111111111111111111111111111111111111111111111111111111111111111111111111111111",
+   "11111111111111111111111111111111111111111111111111111111111111111111111111111111"],
   // Stage 3 — OMEGA CORE
   ["00000000000000000000000000000000000000000000000000000000000000000000000000000000",
    "00000000000000000000000000000000000000000000000000000000000000000000000000000000",
@@ -138,7 +156,7 @@ const SMAPS=[
    "11111111111111111111111111111111111111111111111111111111111111111111111111111111"],
 ];
 let stage=1;
-function tileAt(c,r){if(c<0||c>=MW)return 1;if(r<0)return 0;if(r>=MH)return 1;return+(SMAPS[stage-1][r]||'0')[c]||0;}
+function tileAt(c,r){if(c<0||c>=MW)return 1;if(r<0)return 0;if(r>=MH)return 1;const sm=SMAPS[Math.min(stage-1,SMAPS.length-1)];return+(sm[r]||'0')[c]||0;}
 const solid=(c,r)=>tileAt(c,r)===1||(tileAt(c,r)===3&&DEBRIS_MAP.has(c+','+r));
 // 破壊可能タイルのマップ (key="c,r" -> HP)
 const DEBRIS_MAP=new Map();
@@ -157,9 +175,9 @@ function damageDebris(c,r,dmg){
 
 // ── Robots ───────────────────────────────────────────────────────
 const ROBOTS=[
-  {id:'LIGHT-01',name:'VANGUARD Mk.I', spd:2.2,jv:-7.8,hp:100,atkCd:12,dmg:8, bspd:5.2,btype:'laser',blife:55,auto:true},
-  {id:'HEAVY-01',name:'BREACHER Mk.I', spd:1.6,jv:-6.5,hp:160,atkCd:28,dmg:22,bspd:3.8,btype:'shell',blife:42,auto:false},
-  {id:'SCOUT-01',name:'SPECTER Mk.I',  spd:3.0,jv:-8.5,hp:70, atkCd:18,dmg:5, bspd:5.5,btype:'burst',blife:46,auto:true},
+  {id:'LIGHT-01',name:'VANGUARD Mk.I', spd:2.2,jv:-7.8,hp:100,atkCd:12,dmg:8, bspd:5.2,btype:'laser',blife:60,auto:true},
+  {id:'HEAVY-01',name:'BREACHER Mk.I', spd:1.6,jv:-6.5,hp:100,atkCd:28,dmg:66,bspd:5.2,btype:'shell',blife:65,auto:false},
+  {id:'SCOUT-01',name:'SPECTER Mk.I',  spd:3.0,jv:-8.5,hp:100,atkCd:18,dmg:5, bspd:5.5,btype:'burst',blife:46,auto:true},
 ];
 let curRobot=0;
 const UPG={hpBonus:0,dmgMul:1.0,spdMul:1.0,subSlots:0,
@@ -168,22 +186,22 @@ let upgradeChoices=[];   // Round1で選んだIDを記録
 
 const UPG_TREE={
   round1:[
-    {id:'offense',title:'強襲システム',col:'#e04020',desc1:'武器ダメージ ×1.40',desc2:'次フェーズ：貫通/過負荷'},
-    {id:'defense',title:'防衛装甲',   col:'#2080e0',desc1:'最大HP +50 / 全回復',desc2:'次フェーズ：バリア強化/修復回路'},
-    {id:'mobility',title:'機動強化',  col:'#20c060',desc1:'速度 ×1.15 / MSL+1',desc2:'次フェーズ：ターボ/高速リロード'},
+    {id:'offense',title:'⚔ 攻撃強化',col:'#e04020',desc1:'全武器ダメージ ×1.40',desc2:'次: 貫通弾 or 過負荷'},
+    {id:'defense',title:'🛡 防御強化',col:'#2080e0',desc1:'最大HP +50 & 全回復', desc2:'次: バリア強化 or 自動修復'},
+    {id:'mobility',title:'💨 機動強化',col:'#20c060',desc1:'移動速度 ×1.15 / MSL+1',desc2:'次: ターボ or 高速リロード'},
   ],
   round2:{
     offense:[
-      {id:'pierce',  title:'貫通レーザー',col:'#ff6040',desc1:'弾が敵を貫通する',desc2:'DMG ×1.20 追加'},
-      {id:'overload',title:'オーバーロード',col:'#ff4080',desc1:'武器ダメージ ×1.50',desc2:'ゲージ回収速度 UP'},
+      {id:'pierce',  title:'⚡ 貫通弾',   col:'#ff6040',desc1:'弾が敵を貫通する',desc2:'ダメージ ×1.20 追加'},
+      {id:'overload',title:'🔥 武器過負荷',col:'#ff4080',desc1:'武器ダメージ ×1.50',desc2:'ビームゲージ増加UP'},
     ],
     defense:[
-      {id:'fortress',title:'バリア強化', col:'#40a0ff',desc1:'バリア持続 ×1.80',desc2:'展開クールタイム短縮'},
-      {id:'regen',   title:'修復回路',   col:'#40ffb0',desc1:'微量HP自動回復',desc2:'リスペナルティ半減'},
+      {id:'fortress',title:'🔷 バリア強化',col:'#40a0ff',desc1:'バリア持続 ×1.80',desc2:'バリア中HP少し回復'},
+      {id:'regen',   title:'💚 自動修復', col:'#40ffb0',desc1:'地上でHP自動回復',desc2:'リスポーンペナルティ半減'},
     ],
     mobility:[
-      {id:'turbo',  title:'ターボドライブ',col:'#60ff80',desc1:'速度 ×1.25 / MSL+1',desc2:'ジャンプ強化'},
-      {id:'reload', title:'高速リロード', col:'#c0ff40',desc1:'MSL自動補充',desc2:'射撃クールダウン短縮'},
+      {id:'turbo',  title:'🚀 ターボ', col:'#60ff80',desc1:'速度 ×1.25 / MSL+1', desc2:'ジャンプ力強化'},
+      {id:'reload', title:'⚙ 高速装填', col:'#c0ff40',desc1:'MSLが自動補充される',desc2:'射撃クールダウン短縮'},
     ],
   },
 };
@@ -214,8 +232,8 @@ let combo=0,comboTimer=0,comboMul=1.0;
 let hiScore=0;try{hiScore=+localStorage.getItem('cr_hi')||0;}catch(e){}
 let difficulty=1; // 0=EASY 1=NORMAL 2=HARD
 const DIFF=[
-  {label:'EASY',  hpM:0.60, dmgM:0.75, cdM:1.35, spdM:0.82, scoreM:0.8,  col:'#20e060'},
-  {label:'NORMAL',hpM:1.00, dmgM:1.00, cdM:1.00, spdM:1.00, scoreM:1.0,  col:'#00d8a8'},
+  {label:'EASY',  hpM:0.35, dmgM:0.45, cdM:1.80, spdM:0.65, scoreM:0.6,  col:'#20e060'},
+  {label:'NORMAL',hpM:0.65, dmgM:0.80, cdM:1.30, spdM:0.85, scoreM:0.9,  col:'#00d8a8'},
   {label:'HARD',  hpM:1.55, dmgM:1.30, cdM:0.72, spdM:1.20, scoreM:1.5,  col:'#e04020'},
 ];
 const dif=()=>DIFF[difficulty];
@@ -225,7 +243,8 @@ let upgradeScreen=false,upgradeRound=1;
 let stageIntro=false,stageIntroTimer=0,stageIntroName='';
 let endingScreen=false,endingTimer=0;
 let briefingActive=false,briefingTimer=0,briefingSkip=false;
-let briefPhase=0; // 0=phase1(敵情報) 1=phase2(ボス情報)
+let briefPhase=0; // 0=phase1 1=phase2
+let briefCorruptFlash=0;
 let briefLineIdx=0,briefCharIdx=0,briefCharTimer=0,briefPaused=false;
 let briefSpeed=1; // 0=ゆっくり(1文字/2f) 1=普通(1文字/f) 2=はやい(2文字/f)
 const BRIEF_SPEEDS=[0.5,1,2];
@@ -236,7 +255,7 @@ let subAmmo=3,subAmmoMax=3;
 // Beam gauge & barrier
 const BEAM_STATS=[
   {fillRate:0.55,barrierDur:150,col:'#00e8c8',name:'BARRIER'}, // VANGUARD: balanced
-  {fillRate:0.28,barrierDur:260,col:'#ff8020',name:'FORTRESS'}, // BREACHER: slow charge, long barrier
+  {fillRate:0.28,barrierDur:300,col:'#ff8020',name:'FORTRESS'}, // BREACHER: 5秒(2倍)
   {fillRate:1.10,barrierDur:70, col:'#20e880',name:'VEIL'},    // SPECTER: fast charge, brief veil
 ];
 let beamGauge=0,barrierActive=false,barrierTimer=0;
@@ -361,7 +380,7 @@ window.addEventListener('keydown',e=>{
   if(gameOver&&goTimer<=60){
     if(k===KEYS.left||k==='ArrowLeft'||k==='a'||k==='A')goChoice=0;
     if(k===KEYS.right||k==='ArrowRight'||k==='d'||k==='D')goChoice=1;
-    if(k===KEYS.jump||k===KEYS.shoot||k==='ArrowUp'||k===' '||k==='z'||k==='Z'){goSelected=true;goTimer=1;}
+    if(k===KEYS.jump||k===KEYS.shoot||k==='ArrowUp'||k===' '||k==='z'||k==='Z'||k==='x'||k==='X'){goSelected=true;goTimer=1;}
     return;
   }
   // ── タイトル ─────────────────────────────────────────────
@@ -771,6 +790,34 @@ const BRIEFINGS=[
        '……OMEGA-00を倒し、生きて帰ってこい。',
      ]},
    ]},
+  // Stage 4 — 汚染された司令官
+  {stage:4,
+   zone:'中枢基地Ω-01 — 敵の心臓部',
+   classification:'機密レベル：ΩMEGA',
+   target:'CORE-01 中枢コアシステム',
+   targetType:'基地型・全域攻撃システム',
+   dangerLv:5,
+   intel:['中枢基地Ω-01への侵入に成功した。','内部には全種の敵機が密集展開している。','基地全体が武装。空からも攻撃が降り注ぐ。'],
+   obj:'中枢コアCORE-01を破壊せよ。',
+   warn:'基地全体が武器だ。あらゆる方向から攻撃が来る。',
+   weakDesc:'コア中央の輝く部位に集中攻撃せよ。',
+   corruptPhase1:false,
+   dialog:[
+     {spk:'司令部',corrupt:false,lines:[
+       '……よく聞いてくれ。これが最後の任務だ。',
+       '敵の中枢基地Ω-01——全ての命令がここから出ている。',
+       '内部には大量の防衛機が展開している。',
+       '基地そのものが兵器だ。空からも攻撃が来る。',
+       '……君なら、できると信じている。',
+     ]},
+     {spk:'司令部',corrupt:true,lines:[
+       '…………ターゲット確認。コアシステムに接続——',
+       '貴様を……排除——いや……コアを破壊…………せよ。',
+       '…我々は……一つだ……いや、違う……聞こえるか……',
+       '気をつけろ！司令官の通信が乗っ取られている！',
+       '自分を取り戻せ……！コアを……壊せ！頼む……！',
+     ]},
+   ]},
 ];
 function getBriefing(){return BRIEFINGS[stage-1]||BRIEFINGS[0];}
 
@@ -896,23 +943,29 @@ const SSETS=[
   [{t:'turret',x:19,y:12},{t:'drone',x:23,y:12},{t:'flyer',x:28,y:7},{t:'turret',x:34,y:12},
    {t:'drone',x:38,y:12},{t:'flyer',x:43,y:6},{t:'turret',x:50,y:12},{t:'drone',x:54,y:12},
    {t:'flyer',x:58,y:7},{t:'drone',x:65,y:12},{t:'turret',x:70,y:12}],
-  [{t:'stalker',x:5,y:12},{t:'drone',x:12,y:12},{t:'flyer',x:18,y:7},{t:'stalker',x:24,y:12},
-   {t:'turret',x:15,y:12},{t:'flyer',x:30,y:5},{t:'drone',x:20,y:12},{t:'stalker',x:40,y:12},
-   {t:'flyer',x:44,y:7},{t:'turret',x:50,y:12},{t:'drone',x:45,y:12},{t:'stalker',x:62,y:12},
-   {t:'flyer',x:67,y:5},{t:'turret',x:65,y:12}],
+  [{t:'stalker',x:14,y:12},{t:'drone',x:18,y:12},{t:'flyer',x:22,y:7},{t:'stalker',x:28,y:12},
+   {t:'turret',x:24,y:12},{t:'flyer',x:34,y:5},{t:'drone',x:30,y:12},{t:'stalker',x:42,y:12},
+   {t:'flyer',x:46,y:7},{t:'turret',x:52,y:12},{t:'drone',x:48,y:12},{t:'stalker',x:64,y:12},
+   {t:'flyer',x:68,y:5},{t:'turret',x:66,y:12}],
   // Stage 3 — all types, max density
   [{t:'stalker',x:4,y:12},{t:'flyer',x:8,y:6},{t:'stalker',x:14,y:12},{t:'drone',x:10,y:12},
    {t:'turret',x:18,y:12},{t:'flyer',x:22,y:5},{t:'stalker',x:26,y:12},{t:'drone',x:30,y:12},
    {t:'flyer',x:34,y:7},{t:'stalker',x:38,y:12},{t:'turret',x:42,y:12},{t:'drone',x:46,y:12},
    {t:'stalker',x:50,y:12},{t:'flyer',x:54,y:6},{t:'turret',x:58,y:12},{t:'stalker',x:63,y:12},
    {t:'flyer',x:68,y:5},{t:'drone',x:65,y:12}],
+  // Stage 4 — 基地内部・全種大量配置
+  [{t:'turret',x:14,y:12},{t:'stalker',x:18,y:12},{t:'drone',x:22,y:12},{t:'flyer',x:26,y:6},
+   {t:'stalker',x:30,y:12},{t:'turret',x:34,y:12},{t:'flyer',x:38,y:5},{t:'drone',x:42,y:12},
+   {t:'stalker',x:46,y:12},{t:'turret',x:50,y:12},{t:'flyer',x:54,y:7},{t:'stalker',x:58,y:12},
+   {t:'drone',x:62,y:12},{t:'turret',x:66,y:12},{t:'flyer',x:70,y:5},{t:'stalker',x:72,y:12}],
 ];
 
 function spawnEnemies(){
   enemies.length=0;bullets.length=0;missiles.length=0;
   const r=mkRng(0xABCD+stage*37);
   const bonus=(stage-1)*18;
-  for(const s of SSETS[stage-1]){
+  const sset=SSETS[Math.min(stage-1,SSETS.length-1)];
+  for(const s of sset){
     const hp=Math.ceil(({turret:32,drone:22,flyer:18,stalker:60}[s.t]+bonus)*dif().hpM);
     enemies.push({type:s.t,x:s.x*TS,y:s.y*TS-EH[s.t],startX:s.x*TS,startY:s.y*TS-EH[s.t],
       vx:0,vy:0,hp,maxHp:hp,dead:false,deathTimer:0,
@@ -1002,17 +1055,68 @@ function updateEnemies(){
 function spawnBoss(){
   const bx=(MW-9)*TS;
   if(stage===1)
-    boss={type:'titan', x:bx,y:10*TS,w:32,h:40,vx:0,vy:0,hp:Math.ceil(600*dif().hpM),maxHp:Math.ceil(600*dif().hpM),dead:false,deathSeq:0,phase:1,facing:-1,shieldTimer:0,t1:40,c1:60,t2:80,c2:120,weakRelX:13,weakRelY:14,weakW:6,weakH:6,weakFlash:0};
+    boss={type:'titan',x:bx,y:10*TS,w:32,h:40,vx:0,vy:0,hp:Math.ceil(600*dif().hpM),maxHp:Math.ceil(600*dif().hpM),dead:false,deathSeq:0,phase:1,facing:-1,shieldTimer:0,t1:40,c1:60,t2:80,c2:120,weakRelX:13,weakRelY:14,weakW:6,weakH:6,weakFlash:0};
   else if(stage===2)
-    boss={type:'siege', x:bx,y:9*TS, w:44,h:46,vx:0,vy:0,hp:Math.ceil(900*dif().hpM),maxHp:Math.ceil(900*dif().hpM),dead:false,deathSeq:0,phase:1,facing:-1,shieldTimer:0,t1:40,c1:55,t2:70,c2:100,t3:60,c3:95,weakRelX:18,weakRelY:16,weakW:8,weakH:7,weakFlash:0};
-  else
-    boss={type:'omega', x:bx,y:8*TS, w:40,h:48,vx:0,vy:0,hp:Math.ceil(1400*dif().hpM),maxHp:Math.ceil(1400*dif().hpM),dead:false,deathSeq:0,phase:1,facing:-1,shieldTimer:0,weakRelX:14,weakRelY:20,weakW:12,weakH:8,weakFlash:0,
-          t1:38,c1:48, t2:65,c2:90, t3:55,c3:80, t4:120,c4:120,
-          orbs:[],orbTimer:0,dashTimer:0,dashCd:200};
+    boss={type:'siege',x:bx,y:9*TS, w:44,h:46,vx:0,vy:0,hp:Math.ceil(900*dif().hpM),maxHp:Math.ceil(900*dif().hpM),dead:false,deathSeq:0,phase:1,facing:-1,shieldTimer:0,t1:40,c1:55,t2:70,c2:100,t3:60,c3:95,weakRelX:18,weakRelY:16,weakW:8,weakH:7,weakFlash:0};
+  else if(stage===3)
+    boss={type:'omega',x:bx,y:8*TS, w:40,h:48,vx:0,vy:0,hp:Math.ceil(1400*dif().hpM),maxHp:Math.ceil(1400*dif().hpM),dead:false,deathSeq:0,phase:1,facing:-1,shieldTimer:0,weakRelX:14,weakRelY:20,weakW:12,weakH:8,weakFlash:0,
+          t1:38,c1:48,t2:65,c2:90,t3:55,c3:80,t4:120,c4:120,orbs:[],orbTimer:0,dashTimer:0,dashCd:200};
+  else{ // Stage4: CORE-01
+    const rainCd=difficulty===0?80:difficulty===1?55:38;
+    const lasCd =difficulty===0?120:difficulty===1?85:62;
+    boss={type:'core',x:(MW/2|0)*TS,y:3*TS,w:48,h:36,vx:0,vy:0,
+      hp:Math.ceil(2000*dif().hpM),maxHp:Math.ceil(2000*dif().hpM),
+      dead:false,deathSeq:0,phase:1,facing:-1,shieldTimer:0,
+      weakRelX:15,weakRelY:10,weakW:18,weakH:16,weakFlash:0,
+      t1:50,c1:65,t2:90,c2:110,t3:70,c3:lasCd,
+      rainTimer:0,rainCd,laserActive:0,laserX:0};
+  }
+}
+
+// ── CORE-01 AI (Stage4ボス) ──────────────────────────────────────
+function updateCoreAI(){
+  const bdx=(P.x+PW/2)-(boss.x+boss.w/2);
+  boss.facing=bdx<0?-1:1;
+  boss.vx+=(bdx>0?.03:-.03);boss.vx=Math.max(-1.0,Math.min(1.0,boss.vx))*.88;
+  boss.x+=boss.vx;
+  boss.x=Math.max(4*TS,Math.min((MW-12)*TS,boss.x));
+  boss.y=3*TS; // 天井固定
+  if(boss.hp<boss.maxHp*.5&&boss.phase===1){boss.phase=2;boss.c1=Math.floor(boss.c1*.65);boss.c3=Math.floor(boss.c3*.7);boss.rainCd=Math.floor(boss.rainCd*.65);shake(8);}
+  // 追尾弾
+  if(--boss.t1<=0){
+    boss.t1=boss.c1;
+    const by2=boss.y+boss.h;
+    const ang=Math.atan2((P.y+PH/2)-by2,(P.x+PW/2)-(boss.x+boss.w/2));
+    const sp=boss.phase===2?4.0:3.0;
+    spawnBullet(boss.x+boss.w/2,by2,Math.cos(ang)*sp,Math.sin(ang)*sp,'boss',Math.ceil(12*dif().dmgM),'boss',90);
+    sndEShoot();
+  }
+  // 拡散弾
+  if(--boss.t2<=0){
+    boss.t2=boss.c2;
+    const by2=boss.y+boss.h;
+    const ba=Math.atan2((P.y+PH/2)-by2,(P.x+PW/2)-(boss.x+boss.w/2));
+    const N=boss.phase===2?(difficulty===0?3:5):(difficulty===0?1:3);
+    for(let i=0;i<N;i++){const a=ba+(i-(N-1)/2)*.22;spawnBullet(boss.x+boss.w/2,by2,Math.cos(a)*3.2,Math.sin(a)*3.2,'boss',Math.ceil(8*dif().dmgM),'boss',88);}
+    sndEShoot();shake(1);
+  }
+  // 空爆ミサイル (落下弾)
+  if(--boss.rainTimer<=0){
+    boss.rainTimer=boss.rainCd;
+    const rx=(8+Math.random()*(MW-16))*TS;
+    spawnBullet(rx,0,(Math.random()-.5)*0.8,4.0+Math.random()*2,'boss',Math.ceil(13*dif().dmgM),'mortar',95);
+  }
+  // レーザー (t3でトリガー)
+  if(--boss.t3<=0){
+    boss.t3=boss.c3;
+    boss.laserActive=50;
+    boss.laserX=P.x+PW/2+(Math.random()-.5)*50;
+  }
 }
 
 function updateBoss(){
   if(!boss||boss.dead)return;
+  if(boss.type==='core'){updateCoreAI();return;}
   const bdx=(P.x+PW/2)-(boss.x+boss.w/2);
   boss.facing=bdx<0?-1:1;
   const sp=boss.phase===2?.9:.65;
@@ -1368,7 +1472,8 @@ function drawBoss(){
   const sx=Math.floor(boss.x-CAM.x+shakeX),sy=Math.floor(boss.y-CAM.y+shakeY);if(sx<-60||sx>GW+60)return;
   if(boss.type==='titan')drawTitan(sx,sy);
   else if(boss.type==='siege')drawSiege(sx,sy);
-  else drawOmega(sx,sy);
+  else if(boss.type==='omega')drawOmega(sx,sy);
+  else drawCore(sx,sy);
 }
 function drawTitan(sx,sy){
   X.save();if(boss.facing===1){X.translate(sx+16,0);X.scale(-1,1);X.translate(-(sx+16),0);}
@@ -1493,6 +1598,78 @@ function drawOmega(sx,sy){
   }
   const phlabel=ph===2?' PHASE II':ph===3?' PHASE III':'';
   drawBossHpBar(40,boss.hp,boss.maxHp,AC,`OMEGA-00${phlabel}`);
+}
+
+function drawCore(sx,sy){
+  const T=Date.now();
+  X.save();
+  const r=(lx,ly,w,h,c)=>{X.fillStyle=c;X.fillRect(sx+lx,sy+ly,w,h);};
+  const ph=boss.phase;
+  const RA='#800040',RB='#c00060',RC=ph===2?'#ff60c0':'#e040a0';
+  const BK='#080010',DK='#140828',MD='#201040',LT='#301860';
+  // 外殻オーラ
+  if(ph===2){X.globalAlpha=.06+Math.sin(T*.01)*.04;X.fillStyle=RC;X.fillRect(sx-10,sy-8,68,52);X.globalAlpha=1;}
+  // 本体
+  r(0,0,48,36,MD);r(0,0,48,2,LT);r(0,0,2,36,LT);r(46,0,2,36,BK);r(0,34,48,2,BK);
+  // 上部装甲
+  r(4,0,8,8,DK);r(18,0,12,6,DK);r(36,0,8,8,DK);
+  r(4,0,8,1,LT);r(18,0,12,1,LT);r(36,0,8,1,LT);
+  // 砲台群
+  [-3,8,20,32,43].forEach(bxo=>{r(bxo,8,4,4,DK);r(bxo,8,4,1,LT);r(bxo,10,2,7,BK);});
+  // 中央コア(弱点)
+  const cp=.5+Math.sin(T*.012)*.5;
+  r(14,10,20,16,BK);r(16,12,16,12,RA);r(18,14,12,8,RB);r(20,16,8,4,RC);
+  X.globalAlpha=cp*.65;X.fillStyle=RC;X.fillRect(sx+14,sy+10,20,16);X.globalAlpha=1;
+  r(22,18,4,2,'#ffffff');
+  // 弱点枠点滅
+  X.strokeStyle='#ffff00';X.lineWidth=1;
+  X.globalAlpha=.45+Math.sin(T*.014)*.45;
+  X.strokeRect(sx+15,sy+11,18,14);X.globalAlpha=1;
+  // 下部構造
+  r(2,28,44,6,DK);
+  for(let i=0;i<6;i++)r(4+i*7,28,5,6,MD);
+  // ダメージ亀裂
+  if(boss.hp<boss.maxHp*.5){
+    X.fillStyle='rgba(0,0,0,.5)';X.fillRect(sx+6,sy+3,2,12);X.fillRect(sx+30,sy+5,2,10);
+    X.globalAlpha=.35;X.fillStyle='#ff6040';X.fillRect(sx+6,sy+3,1,10);X.globalAlpha=1;
+  }
+  if(boss.shieldTimer>0){X.globalAlpha=boss.shieldTimer/3*.55;X.fillStyle='#ffffff';X.fillRect(sx,sy,48,36);X.globalAlpha=1;boss.shieldTimer--;}
+  if(boss.dead){X.globalAlpha=Math.min(.9,boss.deathSeq/60);X.fillStyle='#ff30c0';X.fillRect(sx,sy,48,36);X.globalAlpha=1;}
+  X.restore();
+  // レーザー描画 (boss.laserActive)
+  if(boss.laserActive>0){
+    boss.laserActive--;
+    const lsx=Math.floor(boss.laserX-CAM.x+shakeX);
+    if(boss.laserActive>22){
+      // 警告線
+      X.globalAlpha=(50-boss.laserActive)/28*.65;
+      X.strokeStyle='#ff8080';X.lineWidth=2;X.setLineDash([5,4]);
+      X.beginPath();X.moveTo(lsx,0);X.lineTo(lsx,GH);X.stroke();
+      X.setLineDash([]);X.globalAlpha=1;
+    } else {
+      // 実際のレーザー
+      X.strokeStyle='rgba(255,60,60,.9)';X.lineWidth=5;
+      X.beginPath();X.moveTo(lsx,0);X.lineTo(lsx,GH);X.stroke();
+      X.globalAlpha=.22;X.fillStyle='#ff4040';X.fillRect(lsx-8,0,16,GH);X.globalAlpha=1;
+      // ヒット判定
+      if(P.flashTimer<=0&&Math.abs(P.x+PW/2-boss.laserX)<12){
+        P.hp=Math.max(0,P.hp-Math.ceil(15*dif().dmgM));P.flashTimer=26;sndHit();shake(4);
+        if(P.hp<=0&&!gameOver){
+          gameOver=true;goTimer=180;goChoice=0;goSelected=false;deathExplosionDone=false;
+          slowMo=0.08;slowMoTimer=180;sndDeathSlowmo();
+          const dx=P.x+PW/2,dy=P.y+PH/2;
+          spawnExplosion(dx,dy,true);spawnExplosion(dx,dy,true);shake(12);
+          for(let ii=0;ii<30;ii++){
+            const ang=Math.random()*Math.PI*2,sp=3+Math.random()*6;
+            debrisChunks.push({x:dx,y:dy,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp-4,
+              sz:4+Math.random()*8|0,col:['#00e8c8','#406888','#c09838','#ffffff'][Math.random()*4|0],
+              life:80+Math.random()*60|0,max:140,rot:Math.random()*Math.PI*2,rotV:(Math.random()-.5)*.5,bounced:0});
+          }
+        }
+      }
+    }
+  }
+  drawBossHpBar(48,boss.hp,boss.maxHp,RC,'CORE-01 中枢コア');
 }
 
 function drawBossHpBar(bw,hp,maxHp,col,name){
@@ -2003,7 +2180,8 @@ function drawBriefing(){
   const portX=MARGIN,portY=INNER_Y,portH=INNER_H;
   X.fillStyle='rgba(0,0,0,.82)';X.fillRect(portX,portY,PORT_W,portH);
   X.strokeStyle=sc+'55';X.lineWidth=1.5;X.strokeRect(portX,portY,PORT_W,portH);
-  drawCommanderPortrait(portX+PORT_W/2|0,portY+20,1.0);
+  const isCorrupt=stage===4&&briefPhase>=1;
+  drawCommanderPortrait(portX+PORT_W/2|0,portY+20,1.0,isCorrupt);
   X.fillStyle=sc;X.font='bold 6px "Courier New",monospace';X.textAlign='center';
   X.fillText('司令部',portX+PORT_W/2,portY+portH-22);
   X.fillStyle='rgba(0,200,160,.45)';X.font='5px "Courier New",monospace';
@@ -2306,7 +2484,7 @@ function drawBossAnalysis(x,y,w,h,b,sc){
   }
 }
 
-function drawCommanderPortrait(cx,y,alpha){
+function drawCommanderPortrait(cx,y,alpha,corrupt){
   X.globalAlpha=alpha;
   const T=Date.now();
   // ノイズライン演出 (通信ノイズ)
@@ -2327,8 +2505,14 @@ function drawCommanderPortrait(cx,y,alpha){
   // 目 (点滅)
   const eyeA=0.6+Math.sin(T*.004)*.4;
   X.globalAlpha=alpha*eyeA;
-  X.fillStyle='rgba(0,255,200,.8)';
-  X.fillRect(cx-8,y+12,5,3);X.fillRect(cx+4,y+12,5,3); // 目
+  const eyeCol=corrupt?`rgba(255,${20+Math.sin(Date.now()*.02)*20|0},${20+Math.sin(Date.now()*.03)*20|0},.9)`:'rgba(0,255,200,.8)';
+  X.fillStyle=eyeCol;
+  X.fillRect(cx-8,y+12,5,3);X.fillRect(cx+4,y+12,5,3);
+  if(corrupt){
+    X.globalAlpha=alpha*(.18+Math.sin(Date.now()*.015)*.12);
+    X.fillStyle='#ff2000';X.fillRect(cx-22,y,44,68);
+    X.globalAlpha=alpha;
+  }
   X.globalAlpha=alpha;
   // ヘッドセット
   X.strokeStyle='rgba(0,200,160,.6)';X.lineWidth=1.5;
@@ -2539,9 +2723,9 @@ function render(){
   X.setTransform(_sx,0,0,_sy,0,0);
   const stageHue=stage===2?20:200;
   const g=X.createLinearGradient(0,0,0,GH);
-  g.addColorStop(0,stage===3?'#080014':stage===2?'#080104':'#010304');
-  g.addColorStop(.5,stage===3?'#100828':stage===2?'#180810':'#05101e');
-  g.addColorStop(1,stage===3?'#0c0618':stage===2?'#1a0810':'#0b1825');
+  g.addColorStop(0,stage===4?'#1a0010':stage===3?'#080014':stage===2?'#080104':'#010304');
+  g.addColorStop(.5,stage===4?'#260018':stage===3?'#100828':stage===2?'#180810':'#05101e');
+  g.addColorStop(1,stage===4?'#1a0014':stage===3?'#0c0618':stage===2?'#1a0810':'#0b1825');
   X.fillStyle=g;X.fillRect(0,0,GW,GH);
   // Stars
   for(const s of STARS){const px=((s.x-CAM.x*.02)%(GW*3)+GW*3)%(GW*3);if(px<GW+2){X.fillStyle=`rgba(${stage===2?'255,200,175':'175,195,215'},${s.a})`;X.fillRect(px,s.y,s.s,s.s);}}
@@ -2558,6 +2742,7 @@ function render(){
   if(bgMid)X.drawImage(bgMid,CAM.x*.32,0,GW,GH,0,0,GW,GH);
   if(stage===2){X.fillStyle='rgba(100,0,20,.18)';X.fillRect(0,0,GW,GH);}
   if(stage===3){X.fillStyle='rgba(60,0,80,.22)';X.fillRect(0,0,GW,GH);}
+  if(stage===4){X.fillStyle='rgba(80,0,30,.28)';X.fillRect(0,0,GW,GH);}
   // Haze
   const hz=X.createLinearGradient(0,GH*.6,0,GH);hz.addColorStop(0,'rgba(0,0,0,0)');hz.addColorStop(1,stage===3?'rgba(16,4,24,.58)':stage===2?'rgba(20,4,8,.55)':'rgba(8,18,36,.48)');
   X.fillStyle=hz;X.fillRect(0,0,GW,GH);
@@ -2606,7 +2791,8 @@ function advanceBriefing(){
   if(briefLineIdx>=phase.lines.length){
     if(briefPhase<dlg.length-1){
       briefPhase++;briefLineIdx=0;briefCharIdx=0;briefPaused=false;briefCharTimer=0;
-      briefAnimVals={danger:0,hp:0,phase:0,orb:0,gauge:0}; // アニメリセット
+      briefAnimVals={danger:0,hp:0,phase:0,orb:0,gauge:0};
+      if(stage===4&&briefPhase===1)briefCorruptFlash=45;
     } else {
       launchStage();
     }
@@ -2614,7 +2800,7 @@ function advanceBriefing(){
 }
 function startStage(){
   briefingActive=true;briefingTimer=0;briefT=0;briefingSkip=false;
-  briefPhase=0;briefLineIdx=0;briefCharIdx=0;briefPaused=false;
+  briefPhase=0;briefLineIdx=0;briefCharIdx=0;briefPaused=false;briefCorruptFlash=0;
 }
 function launchStage(){
   briefingActive=false;
@@ -2684,7 +2870,8 @@ function loop(){
         if(boss.deathSeq<=0){
           if(stage===1){upgradeRound=1;upgradeScreen=true;stopBGM();}
           else if(stage===2){upgradeRound=2;upgradeScreen=true;stopBGM();}
-          else{endingScreen=true;endingTimer=300;stopBGM();sndEnding();}
+          else if(stage===3){stage=4;startStage();}
+          else{endingScreen=true;endingTimer=400;stopBGM();sndEnding();}
         }}
     } else if(stageClear){
       if(clearTimer>0)clearTimer--;
