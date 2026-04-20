@@ -118,6 +118,24 @@ const SMAPS=[
    "11111111111111111111111111111111111111111111111111111111111111111111111111111111",
    "11111111111111111111111111111111111111111111111111111111111111111111111111111111",
    "11111111111111111111111111111111111111111111111111111111111111111111111111111111"],
+  // Stage 3 — OMEGA CORE (通路確保・空中プラットフォームのみ)
+  ["00000000000000000000000000000000000000000000000000000000000000000000000000000000",
+   "00000000000000000000000000000000000000000000000000000000000000000000000000000000",
+   "00000000000000000000000000000000000000000000000000000000000000000000000000000000",
+   "00000000000000000000002222000000000000000000000000002222000000000000000000000000",
+   "00000000002222000000000000000000002222000000000000000000000000002222000000000000",
+   "00000000000000000000000000000000000000000000002222000000000000000000000000000000",
+   "00002222000000000000000000000000000000000000000000000000000000000000002222000000",
+   "00000000000000002222000000000000000000002222000000000000002222000000000000000000",
+   "00000000000000000000000000002222000000000000000000002222000000000000000000000000",
+   "00000000000000000000000000000000000000000000000000000000000000000000000000000000",
+   "00000002220000000000000000002220000000000000000000002220000000000000000000000000",
+   "00000000000000000000222000000000000000000000222000000000000000000000222000000000",
+   "11110000111111110000111111110000111111110000111111110000111111110000111111111111",
+   "11111111111111111111111111111111111111111111111111111111111111111111111111111111",
+   "11111111111111111111111111111111111111111111111111111111111111111111111111111111",
+   "11111111111111111111111111111111111111111111111111111111111111111111111111111111",
+   "11111111111111111111111111111111111111111111111111111111111111111111111111111111"],
   // Stage 4 — 中枢基地 (壁と天井のある閉鎖空間)
   ["11111111111111111111111111111111111111111111111111111111111111111111111111111111",
    "11000000000000001100000000000000110000000000000011000000000000001100000000000011",
@@ -132,24 +150,6 @@ const SMAPS=[
    "11000000000000001100000000000000110000000000000011000000000000001100000000000011",
    "11000000000000001100000000000000110000000000000011000000000000001100000000000011",
    "11111111000011111111111100001111111111110000111111111111000011111111111100001111",
-   "11111111111111111111111111111111111111111111111111111111111111111111111111111111",
-   "11111111111111111111111111111111111111111111111111111111111111111111111111111111",
-   "11111111111111111111111111111111111111111111111111111111111111111111111111111111",
-   "11111111111111111111111111111111111111111111111111111111111111111111111111111111"],
-  // Stage 3 — OMEGA CORE
-  ["00000000000000000000000000000000000000000000000000000000000000000000000000000000",
-   "00000000000000000000000000000000000000000000000000000000000000000000000000000000",
-   "00000222200000000000000000000000000000000000000000000000000000000000000000000000",
-   "00000000000000222200000000222200000000000000222200000000222200000000000000000000",
-   "00000000000000000000000000000000222200000000000000000000000000222200000000000000",
-   "00222200000000000000222200000000000000000000000000222200000000000000000000222200",
-   "00000000000000000000000000000000000022220000000000000000000000000022220000000000",
-   "00000000222200000000000000000000000000000000222200000000000000000000000000222200",
-   "00000000000000000000000022220000000000000000000000000022220000000000000000000000",
-   "00000000000000000000000000000000000000000000000000000000000000000000000000000000",
-   "00000000000000000000000000000000000000000000000000000000000000000000000000000000",
-   "00000000000000000000000000000000000000000000000000000000000000000000000000000000",
-   "11110000000031110000000013110000000011110000000031110000000011130000000011111111",
    "11111111111111111111111111111111111111111111111111111111111111111111111111111111",
    "11111111111111111111111111111111111111111111111111111111111111111111111111111111",
    "11111111111111111111111111111111111111111111111111111111111111111111111111111111",
@@ -169,7 +169,16 @@ function initDebris(){
 function damageDebris(c,r,dmg){
   const k=c+','+r;if(!DEBRIS_MAP.has(k))return false;
   const hp=DEBRIS_MAP.get(k)-dmg;
-  if(hp<=0){DEBRIS_MAP.delete(k);spawnDebrisChunks(c*TS+TS/2,r*TS+TS/2);return true;}
+  if(hp<=0){
+    DEBRIS_MAP.delete(k);spawnDebrisChunks(c*TS+TS/2,r*TS+TS/2);
+    // タイル破壊でHP回復 (8HP)
+    if(!gameOver){
+      const healAmt=50;P.hp=Math.min(P.maxHp,P.hp+healAmt);
+      comboTexts.push({x:c*TS+TS/2,y:r*TS,pts:healAmt,cmb:0,life:40,max:40,vy:-0.5,isHeal:true});
+      sndPickup();
+    }
+    return true;
+  }
   DEBRIS_MAP.set(k,hp);return false;
 }
 
@@ -192,16 +201,16 @@ const UPG_TREE={
   ],
   round2:{
     offense:[
-      {id:'pierce',  title:'⚡ 貫通弾',   col:'#ff6040',desc1:'弾が敵を貫通する',desc2:'ダメージ ×1.20 追加'},
-      {id:'overload',title:'🔥 武器過負荷',col:'#ff4080',desc1:'武器ダメージ ×1.50',desc2:'ビームゲージ増加UP'},
+      {id:'pierce',  title:'⚡ 貫通レーザー',col:'#ff6040',desc1:'弾が敵を貫通する',desc2:'さらにダメージ ×1.20'},
+      {id:'overload',title:'🔥 オーバーロード',col:'#ff4080',desc1:'全武器ダメージ ×1.50',desc2:'ビームゲージ増加速度UP'},
     ],
     defense:[
-      {id:'fortress',title:'🔷 バリア強化',col:'#40a0ff',desc1:'バリア持続 ×1.80',desc2:'バリア中HP少し回復'},
-      {id:'regen',   title:'💚 自動修復', col:'#40ffb0',desc1:'地上でHP自動回復',desc2:'リスポーンペナルティ半減'},
+      {id:'fortress',title:'🔷 要塞バリア',col:'#40a0ff',desc1:'バリア持続時間 ×1.80',desc2:'バリア中に少しHP回復'},
+      {id:'regen',   title:'💚 修復回路', col:'#40ffb0',desc1:'地上停止中にHP自動回復',desc2:'リスポーンペナルティ半減'},
     ],
     mobility:[
-      {id:'turbo',  title:'🚀 ターボ', col:'#60ff80',desc1:'速度 ×1.25 / MSL+1', desc2:'ジャンプ力強化'},
-      {id:'reload', title:'⚙ 高速装填', col:'#c0ff40',desc1:'MSLが自動補充される',desc2:'射撃クールダウン短縮'},
+      {id:'turbo',  title:'🚀 ターボドライブ',col:'#60ff80',desc1:'移動速度 ×1.25 / MSL+1', desc2:'ジャンプ力も強化'},
+      {id:'reload', title:'⚙ 高速装填', col:'#c0ff40',desc1:'ミサイル自動補充',desc2:'武器射撃クールダウン短縮'},
     ],
   },
 };
@@ -373,6 +382,7 @@ window.addEventListener('keydown',e=>{
     e.preventDefault();return;
   }
   // ── 設定画面 ─────────────────────────────────────────────
+  if(achieveScreenActive){achieveScreenActive=false;e.preventDefault();return;}
   if(gameState==='settings'){if(k==='Escape')gameState='title';e.preventDefault();return;}
   // ── ブリーフィング ───────────────────────────────────────
   if(briefingActive){advanceBriefing();e.preventDefault();return;}
@@ -388,7 +398,8 @@ window.addEventListener('keydown',e=>{
     if(k===KEYS.left||k==='ArrowLeft'||k==='a'){difficulty=Math.max(0,difficulty-1);return;}
     if(k===KEYS.right||k==='ArrowRight'||k==='d'){difficulty=Math.min(2,difficulty+1);return;}
     if(k==='Escape'||k==='s'||k==='S'){gameState='settings';return;}
-    startGame();return;
+    if(k==='a'||k==='A'){achieveScreenActive=true;return;}
+    if(k!==KEYS.barrier)startGame();return;
   }
   // ── ゲーム中 ─────────────────────────────────────────────
   if(k===KEYS.left)K.left=true;
@@ -414,7 +425,7 @@ window.addEventListener('keyup',e=>{
 });
 function bindBtn(id,key){
   const el=document.getElementById(id);
-  const on=()=>{K[key]=true;if(key==='jump')jumpEdge=true;if(key==='shoot')shootEdge=true;if(key==='sub')subEdge=true;el.classList.add('on');};
+  const on=()=>{K[key]=true;if(key==='jump')jumpEdge=true;if(key==='shoot')shootEdge=true;if(key==='sub')subEdge=true;if(key==='barrier')barrierEdge=true;el.classList.add('on');};
   const off=()=>{K[key]=false;el.classList.remove('on');};
   el.addEventListener('touchstart',e=>{e.preventDefault();on();},{passive:false});
   el.addEventListener('touchend',  e=>{e.preventDefault();off();},{passive:false});
@@ -457,11 +468,12 @@ CV.addEventListener('touchstart',e=>{
       const dx=dsx+i*(dbw+dgap),dy=GH/2+4;
       if(c.x>=dx&&c.x<=dx+dbw&&c.y>=dy&&c.y<=dy+18){difficulty=i;hitDiff=true;break;}
     }
-    // 設定ボタン領域タップ
+    // 設定・実績ボタン領域タップ
     if(!hitDiff){
-      const tx=e.touches[0].clientX,ty=e.touches[0].clientY;
-      const tc2=cvCoord(tx,ty);
-      if(tc2.x>=GW/2-48&&tc2.x<=GW/2+48&&tc2.y>=GH/2+54&&tc2.y<=GH/2+68){gameState='settings';return;}
+      const tc2=cvCoord(e.touches[0].clientX,e.touches[0].clientY);
+      const btnY=GH/2+96,btnW=92,btnH=17;
+      if(tc2.x>=GW/2-btnW-6&&tc2.x<=GW/2-6&&tc2.y>=btnY&&tc2.y<=btnY+btnH){gameState='settings';return;}
+      if(tc2.x>=GW/2+6&&tc2.x<=GW/2+btnW+6&&tc2.y>=btnY&&tc2.y<=btnY+btnH){achieveScreenActive=true;return;}
       startGame();
     }
     return;
@@ -481,6 +493,7 @@ CV.addEventListener('mousemove',e=>{
 });
 CV.addEventListener('click',e=>{
   // ブリーフィング中クリックで進める
+  if(achieveScreenActive){const c=cvCoord(e.clientX,e.clientY);handleAchieveTouch(c.x,c.y);return;}
   if(briefingActive){advanceBriefing();return;}
   if(gameState==='title'){
     const c=cvCoord(e.clientX,e.clientY);
@@ -902,10 +915,15 @@ function drawComboTexts(){
   for(const t of comboTexts){
     const a=t.life/t.max,sx=Math.floor(t.x-CAM.x+shakeX),sy=Math.floor(t.y-CAM.y+shakeY);
     X.globalAlpha=a;X.textAlign='center';
-    const col=t.cmb>=6?'#ff80ff':t.cmb>=3?'#ffff40':'#ffffff';
-    X.fillStyle=col;X.font=`bold ${t.cmb>=6?8:t.cmb>=3?7:6}px "Courier New",monospace`;
-    X.fillText(`+${t.pts}`,sx,sy);
-    if(t.cmb>=3){X.fillStyle=col;X.font='5px "Courier New",monospace';X.fillText(`x${t.cmb} COMBO`,sx,sy+8);}
+    if(t.isHeal){
+      X.fillStyle='#40ff80';X.font='bold 7px "Courier New",monospace';
+      X.fillText(`+${t.pts} HP`,sx,sy);
+    } else {
+      const col=t.cmb>=6?'#ff80ff':t.cmb>=3?'#ffff40':'#ffffff';
+      X.fillStyle=col;X.font=`bold ${t.cmb>=6?8:t.cmb>=3?7:6}px "Courier New",monospace`;
+      X.fillText(`+${t.pts}`,sx,sy);
+      if(t.cmb>=3){X.fillStyle=col;X.font='5px "Courier New",monospace';X.fillText(`x${t.cmb} COMBO`,sx,sy+8);}
+    }
     X.globalAlpha=1;X.textAlign='left';
   }
 }
@@ -1203,6 +1221,7 @@ function killEnemy(e,pts){
   }
   combo++;comboTimer=120;comboMul=Math.min(8,1+Math.floor(combo/3)*.5);
   const gained=Math.floor(pts*comboMul*dif().scoreM);score+=gained;
+  achieveStats.kills++;checkAchievements();
   if(score>hiScore){hiScore=score;try{localStorage.setItem('cr_hi',hiScore);}catch(e){}}
   spawnComboText(e.x+EW[e.type]/2,e.y,gained,combo);
   shake(2);if(subAmmo<subAmmoMax)subAmmo++;
@@ -1224,7 +1243,7 @@ function checkCollisions(){
       const isWeak=b.x>=bwx&&b.x<=bwx+boss.weakW&&b.y>=bwy&&b.y<=bwy+boss.weakH;
       const dmgMult=isWeak?2.8:1;
       boss.hp-=b.dmg*dmgMult;boss.shieldTimer=3;
-      if(isWeak){boss.weakFlash=12;spawnSpark(b.x,b.y,'#ffffff',10,3);spawnSpark(b.x,b.y,'#ffff40',6,2);shake(3);}
+      if(isWeak){boss.weakFlash=12;spawnSpark(b.x,b.y,'#ffffff',10,3);spawnSpark(b.x,b.y,'#ffff40',6,2);shake(3);achieveStats.weakHits++;checkAchievements();}
       else spawnSpark(b.x,b.y,'#ff60ff',6);
       bullets.splice(bi,1);sndHit();shake(1);if(boss.hp<=0)killBoss();continue outer;}}
   }
@@ -2528,6 +2547,52 @@ function drawCommanderPortrait(cx,y,alpha,corrupt){
   X.globalAlpha=1;
 }
 
+function drawCutoff(){
+  const TOTAL=48;
+  const elapsed=TOTAL-briefCutTimer; // 0→48
+  const prog=elapsed/TOTAL;          // 0.0→1.0
+
+  // 前半(0-24): ブリーフィング画面にノイズが走る
+  if(elapsed<24){
+    const ni=(elapsed/24);
+    // ホワイトノイズライン
+    for(let i=0;i<Math.floor(ni*50);i++){
+      X.fillStyle=`rgba(255,255,255,${Math.random()*.6})`;
+      X.fillRect(0,Math.random()*GH|0,GW,Math.random()*5+1|0);
+    }
+    // RGBカラーグリッチ
+    for(let i=0;i<Math.floor(ni*20);i++){
+      const h=Math.random()*360|0;
+      X.fillStyle=`hsla(${h},100%,65%,${Math.random()*.35})`;
+      X.fillRect(Math.random()*GW|0,Math.random()*GH|0,Math.random()*100+10|0,Math.random()*6+2|0);
+    }
+    // 全体フラッシュ
+    X.fillStyle=`rgba(255,255,255,${ni*.25})`;X.fillRect(0,0,GW,GH);
+  }
+  // 後半(24-48): 黒に落ちる + テキスト
+  else{
+    const fp=(elapsed-24)/24; // 0→1
+    X.fillStyle=`rgba(0,0,0,${fp*.96})`;X.fillRect(0,0,GW,GH);
+    // 残像ノイズ
+    if(fp<0.6){
+      for(let i=0;i<20;i++){
+        X.fillStyle=`rgba(200,200,255,${Math.random()*(1-fp)*.3})`;
+        X.fillRect(0,Math.random()*GH|0,GW,Math.random()*3+1|0);
+      }
+    }
+    // 通信終了テキスト
+    const sc=['','#00d8a8','#e04010','#c040ff','#ff40a0'][stage]||'#ffffff';
+    const ta=Math.min(1,(fp-0.1)/0.4);
+    if(ta>0){
+      X.globalAlpha=ta*(fp>0.8?(1-(fp-0.8)/0.2):1);
+      X.fillStyle=sc;X.font='bold 9px "Courier New",monospace';X.textAlign='center';
+      X.fillText('─── 通信終了 ───',GW/2,GH/2-6);
+      X.fillStyle='rgba(200,200,200,.55)';X.font='6px "Courier New",monospace';
+      X.fillText('接続解除',GW/2,GH/2+8);
+      X.textAlign='left';X.globalAlpha=1;
+    }
+  }
+}
 function drawStageIntro(){
   const prog=1-stageIntroTimer/80;
   const alpha=Math.min(1,prog*4)*Math.min(1,(1-prog)*4);
@@ -2663,6 +2728,7 @@ function drawSettings(){
 }
 // ── Title ────────────────────────────────────────────────────────
 let gameState='title',titleT=0;
+let achieveScreenActive=false;
 function drawTitle(){
   const t=titleT++,pulse=.7+Math.sin(t*.07)*.3;
   X.textAlign='center';
@@ -2713,7 +2779,34 @@ function drawTitle(){
     if(isActive){X.fillStyle='rgba(150,200,255,.5)';X.font='5px "Courier New",monospace';X.fillText('[ ACTIVE ]',robotX[i],GH/2+88);}
   });
   curRobot=robotCur;P.flashTimer=savedFlash;
-  CAM.x=savedCam.x;CAM.y=savedCam.y;X.globalAlpha=1;X.textAlign='left';
+  CAM.x=savedCam.x;CAM.y=savedCam.y;X.globalAlpha=1;
+
+  // ── 設定 / 実績ボタン ───────────────────────────────────────
+  const BY=GH/2+96, BW=92, BH=17, pulse2=.5+Math.sin(t*.07)*.5;
+  // 設定ボタン (左)
+  X.fillStyle='rgba(14,8,45,.9)';X.fillRect(GW/2-BW-6,BY,BW,BH);
+  X.strokeStyle=`rgba(130,90,255,${.45+pulse2*.25})`;X.lineWidth=1.5;
+  X.strokeRect(GW/2-BW-6,BY,BW,BH);
+  X.globalAlpha=.06+pulse2*.04;X.fillStyle='#8855ff';X.fillRect(GW/2-BW-6,BY,BW,BH);
+  X.globalAlpha=1;
+  X.fillStyle='rgba(170,130,255,.95)';X.font='bold 7px "Courier New",monospace';X.textAlign='center';
+  X.fillText('⚙  操 作 設 定',GW/2-BW/2-6,BY+11);
+  // 実績ボタン (右)
+  const unlCnt=Object.keys(achievements).length;
+  X.fillStyle='rgba(35,22,0,.9)';X.fillRect(GW/2+6,BY,BW,BH);
+  X.strokeStyle=`rgba(255,200,50,${.45+pulse2*.25})`;X.lineWidth=1.5;
+  X.strokeRect(GW/2+6,BY,BW,BH);
+  X.globalAlpha=.06+pulse2*.04;X.fillStyle='#ffd040';X.fillRect(GW/2+6,BY,BW,BH);
+  X.globalAlpha=1;
+  X.fillStyle='rgba(255,220,80,.95)';X.font='bold 7px "Courier New",monospace';
+  X.fillText(`🏅 実績  ${unlCnt}/${ACHIEVE_DEFS.length}`,GW/2+BW/2+6,BY+11);
+  // キーヒント
+  X.fillStyle='rgba(110,85,180,.4)';X.font='5px "Courier New",monospace';
+  X.fillText('[ S ] 設定   [ A ] 実績',GW/2,BY+25);
+  // ゲームパッド接続
+  let gpConn=false;try{for(const p of navigator.getGamepads()){if(p){gpConn=true;break;}}}catch(_){}
+  if(gpConn){X.fillStyle='rgba(0,210,130,.6)';X.font='5px "Courier New",monospace';X.fillText('🎮 コントローラー接続中',GW/2,BY+34);}
+  X.textAlign='left';
 }
 
 // ── Render ───────────────────────────────────────────────────────
@@ -2752,6 +2845,7 @@ function render(){
   for(let row=r0;row<r1;row++)for(let col=c0;col<c1;col++){const t=tileAt(col,row);if(t<=0)continue;if(t===3&&!DEBRIS_MAP.has(col+','+row))continue;drawTile(Math.floor(col*TS-CAM.x+shakeX),Math.floor(row*TS-CAM.y+shakeY),t);}
 
   if(gameState==='game'){
+    if(briefCutTimer>0){drawCutoff();shakeX=0;shakeY=0;return;}
     if(briefingActive){drawBriefing();shakeX*=.5;shakeY*=.5;return;}
     drawDebris();
     drawPickups();
@@ -2766,6 +2860,7 @@ function render(){
     drawHUD();
     if(upgradeScreen)drawUpgradeScreen();
     drawComboTexts();
+    drawAchieveBadge();
     if(stageIntro)drawStageIntro();
     if(gameOver)drawGameOver();
     if(stageClear)drawStageClear();
@@ -2773,6 +2868,7 @@ function render(){
   }
   if(gameState==='title')drawTitle();
   if(gameState==='settings')drawSettings();
+  if(achieveScreenActive)drawAchieveScreen();
   shakeX*=.5;shakeY*=.5;if(Math.abs(shakeX)<.15)shakeX=0;if(Math.abs(shakeY)<.15)shakeY=0;
 }
 
@@ -2802,8 +2898,199 @@ function startStage(){
   briefingActive=true;briefingTimer=0;briefT=0;briefingSkip=false;
   briefPhase=0;briefLineIdx=0;briefCharIdx=0;briefPaused=false;briefCorruptFlash=0;
 }
+let briefCutTimer=0; // 通信切断演出タイマー
 function launchStage(){
-  briefingActive=false;
+  briefingActive=false; // ブリーフィングは即終了
+  briefCutTimer=48;
+  sndCutoff();
+}
+
+// ================================================================
+//  アチーブメントシステム
+// ================================================================
+const ACHIEVE_DEFS=[
+  {id:'first_kill',  icon:'💥', title:'初撃破',         desc:'最初の敵を倒した'},
+  {id:'combo5',      icon:'🔥', title:'5コンボ',         desc:'5体連続撃破'},
+  {id:'combo10',     icon:'⚡', title:'10コンボ',        desc:'10体連続撃破'},
+  {id:'barrier_pro', icon:'🛡', title:'バリアマスター',  desc:'バリアで10発吸収'},
+  {id:'no_damage_s1',icon:'🌟', title:'無傷のセクター7', desc:'ステージ1をノーダメージクリア'},
+  {id:'missile_ace', icon:'🚀', title:'ミサイルエース',  desc:'ミサイル10発命中'},
+  {id:'weak_killer', icon:'🎯', title:'弱点狙い',        desc:'ボスの弱点に25回命中'},
+  {id:'tile_buster', icon:'🔨', title:'タイル破壊者',    desc:'破壊可能タイルを10個壊した'},
+  {id:'stage4',      icon:'🏆', title:'オメガクリア',    desc:'全4ステージをクリア'},
+  {id:'all_units',   icon:'🤖', title:'万能司令官',      desc:'3種のロボットを全て使用'},
+];
+let achievements={};
+let achieveQueue=[];
+let achieveTimer=0;
+let achieveStats={kills:0,barrierAbsorbs:0,missileHits:0,weakHits:0,tilesBroken:0,unitUsed:new Set(),damageTakenS1:0};
+
+function loadAchievements(){
+  try{const s=localStorage.getItem('cr_ach');achievements=s?JSON.parse(s):{};}
+  catch(e){achievements={};}
+}
+function saveAchievements(){
+  try{localStorage.setItem('cr_ach',JSON.stringify(achievements));}catch(e){}
+}
+function unlock(id){
+  if(achievements[id])return;
+  achievements[id]=Date.now();saveAchievements();
+  const def=ACHIEVE_DEFS.find(d=>d.id===id);if(!def)return;
+  achieveQueue.push({...def,timer:180});
+  // 効果音
+  try{const ac=getAC();if(!ac)return;
+    [660,880,1100].forEach((f,i)=>setTimeout(()=>{const o=ac.createOscillator(),g=ac.createGain();o.connect(g);g.connect(ac.destination);o.type='square';o.frequency.value=f;g.gain.value=.06;g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.12);o.start();o.stop(ac.currentTime+.12);},i*80));
+  }catch(e){}
+}
+function checkAchievements(){
+  achieveStats.unitUsed.add(curRobot);
+  if(achieveStats.kills>=1)unlock('first_kill');
+  if(combo>=5)unlock('combo5');
+  if(combo>=10)unlock('combo10');
+  if(achieveStats.barrierAbsorbs>=10)unlock('barrier_pro');
+  if(achieveStats.missileHits>=10)unlock('missile_ace');
+  if(achieveStats.weakHits>=25)unlock('weak_killer');
+  if(achieveStats.tilesBroken>=10)unlock('tile_buster');
+  if(achieveStats.unitUsed.size>=3)unlock('all_units');
+}
+function drawAchieveBadge(){
+  // キューから1つずつ表示
+  if(achieveQueue.length===0)return;
+  const a=achieveQueue[0];
+  a.timer--;
+  if(a.timer<=0){achieveQueue.shift();return;}
+  const alpha=Math.min(1,a.timer>160?(180-a.timer)/20:a.timer/30);
+  const ay=GH-42;
+  X.globalAlpha=alpha;
+  X.fillStyle='rgba(0,0,0,.75)';X.fillRect(GW-180,ay,172,30);
+  X.strokeStyle='rgba(255,220,60,.6)';X.lineWidth=1.5;X.strokeRect(GW-180,ay,172,30);
+  X.fillStyle='rgba(255,200,40,.2)';X.fillRect(GW-180,ay,172,30);
+  X.fillStyle='#ffdd40';X.font='bold 7px "Courier New",monospace';
+  X.fillText('🏅 実績解除！',GW-172,ay+10);
+  X.fillStyle='#ffffff';X.font='bold 8px "Courier New",monospace';
+  X.fillText(a.icon+' '+a.title,GW-172,ay+22);
+  X.globalAlpha=1;
+}
+loadAchievements();
+
+// ================================================================
+//  アチーブメント一覧画面
+// ================================================================
+function handleAchieveTouch(mx,my){
+  // リセットボタン
+  if(mx>=GW/2-50&&mx<=GW/2+50&&my>=GH-26&&my<=GH-10){
+    if(confirm&&typeof confirm==='function'){
+      // Canvas内なのでconfirmは使えない → リセット確認フラグ
+    }
+    achievements={};saveAchievements();achieveStats={kills:0,barrierAbsorbs:0,missileHits:0,weakHits:0,tilesBroken:0,unitUsed:new Set(),damageTakenS1:0};
+    return;
+  }
+  // 閉じる
+  achieveScreenActive=false;
+}
+let achResetConfirm=0; // ダブルタップ確認用タイマー
+
+function handleAchieveTouch(mx,my){
+  // リセットボタン (ダブルタップ確認)
+  if(mx>=GW/2-55&&mx<=GW/2+55&&my>=GH-28&&my<=GH-10){
+    if(achResetConfirm>0){
+      achievements={};saveAchievements();
+      achResetConfirm=0;
+      sndBarrierOn(); // リセット音
+    } else {
+      achResetConfirm=90; // 90フレーム以内にもう一度タップで確認
+    }
+    return;
+  }
+  // 閉じるボタン or 画面外タップ
+  achieveScreenActive=false;achResetConfirm=0;
+}
+
+function drawAchieveScreen(){
+  if(!achieveScreenActive)return;
+  if(achResetConfirm>0)achResetConfirm--;
+  const T=Date.now();
+  // 背景
+  X.fillStyle='rgba(2,1,8,.97)';X.fillRect(0,0,GW,GH);
+  X.strokeStyle='rgba(255,210,50,.3)';X.lineWidth=1;X.strokeRect(6,6,GW-12,GH-12);
+  // タイトルバー
+  X.fillStyle='rgba(40,28,0,.95)';X.fillRect(6,6,GW-12,18);
+  X.strokeStyle='rgba(255,200,40,.55)';X.lineWidth=1;X.strokeRect(6,6,GW-12,18);
+  X.fillStyle='rgba(255,220,80,.95)';X.font='bold 8px "Courier New",monospace';X.textAlign='center';
+  const unlocked=Object.keys(achievements).length;
+  X.fillText(`🏅 実績  ${unlocked} / ${ACHIEVE_DEFS.length}`,GW/2,19);X.textAlign='left';
+  // 進捗バー
+  X.fillStyle='rgba(0,0,0,.5)';X.fillRect(8,26,GW-16,6);
+  X.fillStyle=unlocked>=ACHIEVE_DEFS.length?'#ffdd40':'rgba(255,180,40,.7)';
+  X.fillRect(8,26,(GW-16)*(unlocked/ACHIEVE_DEFS.length),6);
+  X.strokeStyle='rgba(255,180,40,.3)';X.lineWidth=1;X.strokeRect(8,26,GW-16,6);
+
+  // 実績リスト (2列)
+  const cols=2,colW=(GW-18)/cols,rowH=24,startY=36;
+  ACHIEVE_DEFS.forEach((def,i)=>{
+    const col=i%cols, row=Math.floor(i/cols);
+    const x=8+col*(colW+2), y=startY+row*rowH;
+    const done=!!achievements[def.id];
+    // カード背景
+    X.fillStyle=done?'rgba(40,28,0,.7)':'rgba(10,8,20,.7)';X.fillRect(x,y,colW,rowH-2);
+    X.strokeStyle=done?`rgba(255,200,40,.55)`:'rgba(60,50,80,.4)';X.lineWidth=done?1.5:1;X.strokeRect(x,y,colW,rowH-2);
+    if(done){X.globalAlpha=.08+Math.sin(T*.006+i*.4)*.04;X.fillStyle='#ffdd40';X.fillRect(x,y,colW,rowH-2);X.globalAlpha=1;}
+    // アイコン
+    X.font='9px sans-serif';X.fillText(done?def.icon:'❓',x+6,y+rowH-8);
+    // テキスト
+    X.fillStyle=done?'#ffe080':'rgba(120,100,150,.6)';X.font=`bold 6px "Courier New",monospace`;
+    X.fillText(done?def.title:'???',x+22,y+10);
+    X.fillStyle=done?'rgba(200,180,120,.65)':'rgba(80,70,100,.45)';X.font='5px "Courier New",monospace';
+    X.fillText(done?def.desc:'実績未解除',x+22,y+20);
+    // 解除済みチェック
+    if(done){X.fillStyle='rgba(255,200,40,.7)';X.font='7px sans-serif';X.textAlign='right';X.fillText('✓',x+colW-4,y+16);X.textAlign='left';}
+  });
+
+  // リセットボタン
+  const resetConfirming=achResetConfirm>0;
+  X.fillStyle=resetConfirming?'rgba(180,30,30,.4)':'rgba(20,8,8,.7)';
+  X.fillRect(GW/2-55,GH-28,110,16);
+  X.strokeStyle=resetConfirming?'rgba(255,60,60,.8)':'rgba(160,40,40,.4)';X.lineWidth=1.5;X.strokeRect(GW/2-55,GH-28,110,16);
+  X.fillStyle=resetConfirming?'#ff8080':'rgba(200,80,80,.7)';X.font='bold 6px "Courier New",monospace';X.textAlign='center';
+  X.fillText(resetConfirming?'もう一度タップで確認！':'🗑 実績リセット',GW/2,GH-17);
+  // 閉じるヒント
+  X.fillStyle='rgba(160,130,220,.45)';X.font='5px "Courier New",monospace';
+  X.fillText('ESC / タップで閉じる',GW/2,GH-5);
+  X.textAlign='left';
+}
+
+function sndCutoff(){
+  if(!soundEnabled)return;
+  try{const ac=getAC();if(!ac)return;
+    // ホワイトノイズ (ザザッ)
+    const sr=ac.sampleRate;
+    const buf=ac.createBuffer(1,sr*.25,sr),d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/d.length*3)*.8;
+    const ns=ac.createBufferSource(),ng=ac.createGain();
+    ns.buffer=buf;ns.connect(ng);ng.connect(ac.destination);
+    ng.gain.value=.3;ng.gain.setValueAtTime(.3,ac.currentTime);
+    ng.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.25);
+    ns.start();ns.stop(ac.currentTime+.25);
+    // ピチュン降下音
+    const o=ac.createOscillator(),g2=ac.createGain();
+    o.connect(g2);g2.connect(ac.destination);
+    o.type='sawtooth';
+    o.frequency.setValueAtTime(1800,ac.currentTime);
+    o.frequency.exponentialRampToValueAtTime(80,ac.currentTime+.22);
+    g2.gain.setValueAtTime(.18,ac.currentTime);
+    g2.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.24);
+    o.start();o.stop(ac.currentTime+.24);
+    // ポップ音 (通信切断)
+    const o2=ac.createOscillator(),g3=ac.createGain();
+    o2.connect(g3);g3.connect(ac.destination);
+    o2.type='square';o2.frequency.value=60;
+    g3.gain.setValueAtTime(.12,ac.currentTime+.18);
+    g3.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.28);
+    o2.start(ac.currentTime+.18);o2.stop(ac.currentTime+.28);
+  }catch(e){}
+}
+function actualLaunchStage(){
+  briefingActive=false;briefCutTimer=0;
   P.x=2*TS;P.y=12*TS-PH;P.vx=0;P.vy=0;P.flashTimer=0;
   spawnEnemies();spawnPickups();bullets.length=0;missiles.length=0;parts.length=0;
   CAM.x=0;CAM.y=0;stageClear=false;gameOver=false;combo=0;comboTimer=0;comboMul=1.0;comboTexts.length=0;
@@ -2815,6 +3102,7 @@ function launchStage(){
 function startGame(){
   gameState='game';stage=1;score=0;UPG.hpBonus=0;UPG.dmgMul=1;UPG.spdMul=1;UPG.subSlots=0;
   subAmmo=3;subAmmoMax=3;P.maxHp=rHp();P.hp=P.maxHp;updUnitBtn();
+  achieveStats={kills:0,barrierAbsorbs:0,missileHits:0,weakHits:0,tilesBroken:0,unitUsed:new Set([curRobot]),damageTakenS1:0};
   startStage();
 }
 
@@ -2850,7 +3138,8 @@ function loop(){
           }
         }
     } else if(!stageClear&&!upgradeScreen){
-      if(briefingActive){briefT++;}
+      if(briefCutTimer>0){briefCutTimer--;if(briefCutTimer===0)actualLaunchStage();}
+      else if(briefingActive){briefT++;}
       else{
         // スローモーション管理
         if(slowMoTimer>0){slowMoTimer--;if(slowMoTimer<=0)slowMo=0;}
@@ -2868,10 +3157,10 @@ function loop(){
       // Boss death sequence
       if(boss&&boss.dead&&boss.deathSeq>0){boss.deathSeq--;if(boss.deathSeq%8===0){spawnExplosion(boss.x+(Math.random()*boss.w|0),boss.y+(Math.random()*boss.h|0),true);sndExplode();shake(5);}
         if(boss.deathSeq<=0){
-          if(stage===1){upgradeRound=1;upgradeScreen=true;stopBGM();}
+          if(stage===1){upgradeRound=1;upgradeScreen=true;stopBGM();if(achieveStats.damageTakenS1===0)unlock('no_damage_s1');}
           else if(stage===2){upgradeRound=2;upgradeScreen=true;stopBGM();}
           else if(stage===3){stage=4;startStage();}
-          else{endingScreen=true;endingTimer=400;stopBGM();sndEnding();}
+          else{endingScreen=true;endingTimer=400;stopBGM();sndEnding();unlock('stage4');}
         }}
     } else if(stageClear){
       if(clearTimer>0)clearTimer--;
