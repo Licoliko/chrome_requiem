@@ -1291,6 +1291,28 @@ function updateCoreAI(){
     boss.laserActive=50;
     boss.laserX=P.x+PW/2+(Math.random()-.5)*50;
   }
+  // レーザーカウントダウン + ヒット判定 (描画と分離)
+  if(boss.laserActive>0){
+    boss.laserActive--;
+    if(boss.laserActive<=22&&boss.laserActive>0){ // 実レーザー中のみ判定
+      if(P.flashTimer<=0&&Math.abs(P.x+PW/2-boss.laserX)<14){
+        const laserDmg=Math.ceil(30*dif().dmgM)*(curRobot===3?1.5:1); // ★ダメージ30(増加)
+        P.hp=Math.max(0,P.hp-laserDmg);P.flashTimer=24;sndHit();shake(5);
+        if(P.hp<=0&&!gameOver){
+          gameOver=true;goTimer=180;goChoice=0;goSelected=false;deathExplosionDone=false;
+          slowMo=0.08;slowMoTimer=180;sndDeathSlowmo();
+          const dx=P.x+PW/2,dy=P.y+PH/2;
+          spawnExplosion(dx,dy,true);spawnExplosion(dx,dy,true);shake(12);
+          for(let ii=0;ii<30;ii++){
+            const ang=Math.random()*Math.PI*2,sp=3+Math.random()*6;
+            debrisChunks.push({x:dx,y:dy,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp-4,
+              sz:4+Math.random()*8|0,col:['#00e8c8','#406888','#c09838','#ffffff'][Math.random()*4|0],
+              life:80+Math.random()*60|0,max:140,rot:Math.random()*Math.PI*2,rotV:(Math.random()-.5)*.5,bounced:0});
+          }
+        }
+      }
+    }
+  }
 }
 
 function updateBoss(){
@@ -3278,6 +3300,7 @@ function render(){
   for(let row=r0;row<r1;row++)for(let col=c0;col<c1;col++){const t=tileAt(col,row);if(t<=0)continue;if(t===3&&!DEBRIS_MAP.has(col+','+row))continue;drawTile(Math.floor(col*TS-CAM.x+shakeX),Math.floor(row*TS-CAM.y+shakeY),t);}
 
   if(gameState==='game'){
+    if(endingScreen){drawEnding();return;} // エンディング中はゲーム描画を完全停止
     if(briefCutTimer>0){drawCutoff();shakeX=0;shakeY=0;return;}
     if(briefingActive){drawBriefing();shakeX*=.5;shakeY*=.5;return;}
     drawDebris();
@@ -3297,7 +3320,6 @@ function render(){
     if(stageIntro)drawStageIntro();
     if(gameOver)drawGameOver();
     if(stageClear)drawStageClear();
-    if(endingScreen)drawEnding();
   }
   if(gameState==='title')drawTitle();
   if(gameState==='settings')drawSettings();
@@ -3557,7 +3579,7 @@ function loop(){
             else{gameState='title';gameOver=false;goSelected=false;stage=1;}
           }
         }
-    } else if(!stageClear&&!upgradeScreen){
+    } else if(!stageClear&&!upgradeScreen&&!endingScreen){
       if(briefCutTimer>0){briefCutTimer--;if(briefCutTimer===0)actualLaunchStage();}
       else if(briefingActive){briefT++;}
       else{
