@@ -155,8 +155,8 @@ const SMAPS=[
    "11111111111111111111111111111111111111111111111111111111111111111111111111111111",
    "11111111111111111111111111111111111111111111111111111111111111111111111111111111"],
   // Stage 4 — 中枢基地 (天井に破壊可能ブロック・フロアはギャップあり)
-  ["33333333333333333333333333333333333333333333333333333333333333333333333333333333",
-   "33333333333333333333333333333333333333333333333333333333333333333333333333333333",
+  ["00000000000000000000000000000000000000000000000000000000000000000000000000000000",
+   "00000000000000000000000000000000000000000000000000000000000000000000000000000000",
    "00000000000000000000000000000000000000000000000000000000000000000000000000000000",
    "00000000000000000000000000000000000000000000000000000000000000000000000000000000",
    "00002222000000002222000000002222000000002222000000002222000000002222000000000000",
@@ -271,6 +271,8 @@ let goSelected=false;
 let upgradeScreen=false,upgradeRound=1;
 let stageIntro=false,stageIntroTimer=0,stageIntroName='';
 let endingScreen=false,endingTimer=0;
+let s4Victory=false,s4VictoryTimer=0; // Stage4クリア演出
+const S4_VICTORY_TOTAL=240; // 4秒
 let briefingActive=false,briefingTimer=0,briefingSkip=false;
 let briefPhase=0; // 0=phase1 1=phase2
 let briefCorruptFlash=0;
@@ -708,8 +710,28 @@ function updateBullets(){
       if(b.type==='slash'){/* 壁貫通 */}
       else if(solid(btc,btr)){
         if(tileAt(btc,btr)===3){damageDebris(btc,btr,1);}
-        if(b.type==='mortar'){spawnExplosion(b.x,b.y,true);sndBigExplode();shake(6);spawnBullet(b.x,b.y,-2.8,-.6,'boss',14,'enemy',52);spawnBullet(b.x,b.y,2.8,-.6,'boss',14,'enemy',52);
-          // モルタル爆風で周囲破壊
+        if(b.type==='mortar'){
+          spawnExplosion(b.x,b.y,true);sndBigExplode();shake(6);
+          spawnBullet(b.x,b.y,-2.8,-.6,'boss',14,'enemy',52);
+          spawnBullet(b.x,b.y,2.8,-.6,'boss',14,'enemy',52);
+          // 爆発半径内のプレイヤーにダメージ（直撃）
+          const expR=28;
+          const pdx=(P.x+PW/2)-b.x,pdy=(P.y+PH/2)-b.y;
+          if(pdx*pdx+pdy*pdy<expR*expR&&P.flashTimer<=0&&!parryActive){
+            const mortarDmg=Math.ceil(b.dmg*1.2)*(curRobot===3?1.5:1);
+            P.hp=Math.max(0,P.hp-mortarDmg);P.flashTimer=30;sndHit();shake(5);
+            if(P.hp<=0&&!gameOver){
+              gameOver=true;goTimer=180;goChoice=0;goSelected=false;deathExplosionDone=false;
+              slowMo=0.08;slowMoTimer=180;sndDeathSlowmo();
+              const ddx=P.x+PW/2,ddy=P.y+PH/2;
+              spawnExplosion(ddx,ddy,true);spawnExplosion(ddx,ddy,true);shake(12);
+              for(let ii=0;ii<30;ii++){const ang=Math.random()*Math.PI*2,sp=3+Math.random()*6;
+                debrisChunks.push({x:ddx,y:ddy,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp-4,
+                  sz:4+Math.random()*8|0,col:['#00e8c8','#406888','#c09838','#ffffff'][Math.random()*4|0],
+                  life:80+Math.random()*60|0,max:140,rot:Math.random()*Math.PI*2,rotV:(Math.random()-.5)*.5,bounced:0});}
+            }
+          }
+          // モルタル爆風で周囲タイル破壊
           for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++)if(tileAt(btc+dc,btr+dr)===3)damageDebris(btc+dc,btr+dr,2);
         }else spawnSpark(b.x,b.y,'#607080',3);
         bullets.splice(i,1);continue;
@@ -3067,7 +3089,7 @@ function drawEnding(){
   });
   // スキップ促し (el>440 = 7.3秒後から表示)
   if(el>440){
-    const pa=Math.min(1,(el-440)/20);
+    const pa=1.0; // 常にフル表示
     if((T&800)<500){
       X.globalAlpha=pa;X.fillStyle='rgba(0,200,150,.75)';X.font='7px "Courier New",monospace';
       X.fillText('[ タップ / キーでタイトルへ ]',GW/2,GH-14);X.globalAlpha=1;
@@ -3301,6 +3323,11 @@ function render(){
 
   if(gameState==='game'){
     if(endingScreen){drawEnding();return;} // エンディング中はゲーム描画を完全停止
+    // Stage4勝利演出: 地面爆発 + 白フェード
+    if(s4Victory&&s4VictoryTimer>0){
+      const vp=1-s4VictoryTimer/S4_VICTORY_TOTAL;
+      X.fillStyle=`rgba(255,255,255,${Math.pow(vp,2)*0.9})`;X.fillRect(0,0,GW,GH);
+    }
     if(briefCutTimer>0){drawCutoff();shakeX=0;shakeY=0;return;}
     if(briefingActive){drawBriefing();shakeX*=.5;shakeY*=.5;return;}
     drawDebris();
@@ -3595,6 +3622,23 @@ function loop(){
         if(switchAnim>0)switchAnim--;
         updateBeam();
         updateBullets();updateMissiles();updateEnemies();updateBoss();updatePickups();checkCollisions();updateParts();updateComboTexts();updateDebris();updateBoostParticles();
+        // Stage4: ボスがなく敵が全滅 → 勝利演出トリガー
+        if(stage===4&&!boss&&!s4Victory&&!gameOver&&enemies.every(e=>e.dead)){
+          s4Victory=true;s4VictoryTimer=S4_VICTORY_TOTAL;
+          stopBGM();
+          // 地面爆発を大量生成
+          for(let i=0;i<20;i++)setTimeout(()=>{
+            const ex=(4+Math.random()*72|0)*TS;
+            spawnExplosion(ex,12*TS,true);spawnExplosion(ex,12*TS,true);
+            shake(8);sndBigExplode();
+          },i*120);
+        }
+        if(s4Victory&&s4VictoryTimer>0){
+          s4VictoryTimer--;
+          // 追加爆発
+          if(s4VictoryTimer%15===0){const ex=(4+Math.random()*72|0)*TS;spawnExplosion(ex,12*TS,true);shake(4);}
+          if(s4VictoryTimer===0){endingScreen=true;endingTimer=500;sndEnding();unlock('stage4');}
+        }
       }
       // Boss death sequence
       if(boss&&boss.dead&&boss.deathSeq>0){boss.deathSeq--;if(boss.deathSeq%8===0){spawnExplosion(boss.x+(Math.random()*boss.w|0),boss.y+(Math.random()*boss.h|0),true);sndExplode();shake(5);}
@@ -3609,7 +3653,7 @@ function loop(){
       if(clearTimer===0){score+=Math.floor(score*.1);stage=1;startGame();}
     } else if(endingScreen){
       if(endingTimer>0)endingTimer--;
-      if(endingTimer===0){gameState='title';}
+      // endingTimer===0 でもタイトルに自動移動しない。プレイヤーが押すまで表示
     }
     camUpdate();
   }
