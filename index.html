@@ -6,9 +6,13 @@
 <title>CHROME REQUIEM</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{background:#040108;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;min-height:100vh;overflow:hidden;touch-action:none;font-family:'Courier New',monospace;}
-#wrap{position:relative;width:100%;display:flex;flex-direction:column;align-items:center;}
-#gc{display:block;image-rendering:auto;width:100%;max-width:960px;}
+html{height:100%;overflow:hidden;}
+body{background:#040108;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:100%;width:100%;overflow:hidden;touch-action:none;font-family:'Courier New',monospace;}
+#wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;
+  width:100%;overflow:hidden;max-height:100%;}
+/* #gc のサイズは resize() が完全制御 — CSSで width/height を指定しない */
+#gc{display:block;image-rendering:auto;flex-shrink:0;}
 #ctrl{width:100%;max-width:960px;display:flex;justify-content:space-between;align-items:center;padding:5px 6px 4px;background:rgba(0,0,0,.6);border-top:1px solid rgba(120,80,255,.16);box-sizing:border-box;}
 .bg{display:flex;gap:clamp(3px,1.2vw,6px);align-items:center;}
 .btn{display:flex;align-items:center;justify-content:center;border-radius:50%;width:clamp(38px,10vw,52px);height:clamp(38px,10vw,52px);background:rgba(100,60,255,.06);border:1.5px solid rgba(120,80,255,.28);color:rgba(160,120,255,.52);font-size:clamp(14px,4vw,20px);user-select:none;-webkit-tap-highlight-color:transparent;pointer-events:all;transition:background .06s;touch-action:none;}
@@ -63,21 +67,35 @@ const X=CV.getContext('2d');
 let _sx=1,_sy=1; // ゲーム座標→物理ピクセル の倍率
 
 function resize(){
-  const ch=document.getElementById('ctrl').getBoundingClientRect().height||72;
-  const s=Math.min(window.innerWidth/GW,(window.innerHeight-ch-4)/GH);
-  const cw=Math.floor(GW*s), ck=Math.floor(GH*s);
-  CV.style.width=cw+'px'; CV.style.height=ck+'px';
-  document.getElementById('ctrl').style.width=Math.max(cw,240)+'px';
-
-  const DPR=window.devicePixelRatio||1;
-  const pw=Math.round(cw*DPR), ph=Math.round(ck*DPR);
-  if(CV.width!==pw||CV.height!==ph){ CV.width=pw; CV.height=ph; }
+  const ctrl=document.getElementById('ctrl');
+  const ch=ctrl?ctrl.getBoundingClientRect().height:0;
+  // 利用可能な領域 (スクロールバー幅を考慮して -2)
+  const availW=window.innerWidth-2;
+  const availH=window.innerHeight-ch-2;
+  // GW:GH = 480:270 = 16:9 のアスペクト比を維持したスケール
+  const s=Math.min(availW/GW, availH/GH);
+  const cw=Math.floor(GW*s);
+  const ck=Math.floor(GH*s); // = Math.floor(cw*GH/GW) で縦が正確に決まる
+  // Canvas の CSS サイズを明示的に設定 (CSSの width:100% を上書き)
+  CV.style.width=cw+'px';
+  CV.style.height=ck+'px';
+  CV.style.maxWidth='none'; // CSSのmax-widthを無効化
+  // コントロールバーの幅を合わせる
+  if(ctrl)ctrl.style.width=cw+'px';
+  // 物理ピクセル解像度 (Retina対応)
+  const DPR=Math.min(window.devicePixelRatio||1, 3); // 4K等で過大にならないよう上限3
+  const pw=Math.round(cw*DPR);
+  const ph=Math.round(ck*DPR);
+  if(CV.width!==pw||CV.height!==ph){CV.width=pw;CV.height=ph;}
   _sx=pw/GW; _sy=ph/GH;
   X.imageSmoothingEnabled=false;
 }
-window.addEventListener('resize',resize);requestAnimationFrame(resize);
+window.addEventListener('resize',resize);
+// orientationchange でも再計算 (スマホ横縦切替)
+window.addEventListener('orientationchange',()=>setTimeout(resize,100));
 // 初期値
 CV.width=GW;CV.height=GH;X.imageSmoothingEnabled=false;
+resize(); // 即時実行 (requestAnimationFrameより先に)
 
 function mkRng(seed){let s=seed>>>0;return()=>{s^=s<<13;s^=s>>17;s^=s<<5;return(s>>>0)/4294967296;};}
 
@@ -321,92 +339,106 @@ function pollGamepad(){
   const ax=i=>pad.axes[i]||0;
   const lx=ax(0),ly=ax(1);
   const DEAD=0.35;
-  // 移動
-  K.left  = lx<-DEAD||b(14);
-  K.right = lx> DEAD||b(15);
-  // ジャンプ (A / 十字上)
-  const jNow=b(GP_KEYS.jump)||b(12);if(jNow&&!gpPrev.jump){K.jump=true;jumpEdge=true;}
-  else if(!jNow)K.jump=false;
-  // 上スティックでもジャンプ
-  if(ly<-DEAD&&!K.jump){K.jump=true;jumpEdge=true;}
-  else if(ly>-DEAD&&!b(0)&&!b(12)){}
-  gpPrev.jump=jNow;
-  // ショット (X / RT)
-  const sNow=b(GP_KEYS.shoot)||b(7);if(sNow&&!gpPrev.shoot){K.shoot=true;shootEdge=true;}
-  else if(!sNow)K.shoot=false;gpPrev.shoot=sNow;
-  // ミサイル (Y)
-  const subNow=b(GP_KEYS.sub);if(subNow&&!gpPrev.sub){K.sub=true;subEdge=true;}
-  else if(!subNow)K.sub=false;gpPrev.sub=subNow;
-  // バリア (B)
-  const barNow=b(GP_KEYS.barrier);if(barNow&&!gpPrev.barrier){K.barrier=true;barrierEdge=true;}
-  else if(!barNow)K.barrier=false;gpPrev.barrier=barNow;
-  // ユニット切替 (LB)
-  if(b(GP_KEYS.unit)&&!gpPrev.lb&&gameState==='game'&&!upgradeScreen)cycleRobot();
-  gpPrev.lb=b(4);
-  // スタートボタン
-  if(b(9)&&!gpPrev.start){
-    if(gpRebindTarget){gpRebindTarget=null;}
-    else if(achieveScreenActive){achieveScreenActive=false;achResetConfirm=0;}
-    else if(gameState==='settings'){gameState='title';}
-    else if(gameState==='title')startGame();
-    else if(briefingActive)advanceBriefing();
-  }
-  // GPリバインド待ち受け
+
+  // ショットボタン エッジ検出 (UI全画面の汎用決定ボタン)
+  const shootBtnNow=b(GP_KEYS.shoot)||b(7);
+  const shootEdgeGP=shootBtnNow&&!gpPrev.shoot;
+
+  // GPリバインド待ち受け (設定画面中のみ)
   if(gpRebindTarget&&gameState==='settings'){
     for(let i=0;i<pad.buttons.length;i++){
       if(pad.buttons[i]?.pressed&&!gpPrev['_btn'+i]){
-        if(i!==9){GP_KEYS[gpRebindTarget]=i;saveGPKeys();gpRebindTarget=null;}
+        if(i!==9){GP_KEYS[gpRebindTarget]=i;saveGPKeys();gpRebindTarget=null;break;}
       }
-      gpPrev['_btn'+i]=pad.buttons[i]?.pressed;
     }
+    for(let i=0;i<pad.buttons.length;i++)gpPrev['_btn'+i]=pad.buttons[i]?.pressed;
+    gpPrev.shoot=shootBtnNow;
+    return;
   }
-  gpPrev.start=b(9);
-  // セレクト → 設定画面
-  if(b(8)&&!gpPrev.sel&&gameState==='title')gameState='settings';
-  gpPrev.sel=b(8);
-  // タイトルでコントローラーカーソル操作
-  if(gameState==='title'&&!achieveScreenActive){
-    const left=b(14)||ax(0)<-0.5;const right=b(15)||ax(0)>0.5;
-    const up=b(12)||ax(1)<-0.5;const down=b(13)||ax(1)>0.5;
-    if(!gpPrev.lt&&left){
-      if(titleCursor<=2)titleCursor=Math.max(0,titleCursor-1);
-      else if(titleCursor===4)titleCursor=3;
-    }
-    if(!gpPrev.rt&&right){
-      if(titleCursor<=2)titleCursor=Math.min(2,titleCursor+1);
-      else if(titleCursor===3)titleCursor=4;
-    }
-    if(!gpPrev.gpUp&&up){if(titleCursor>=3)titleCursor=difficulty;}
-    if(!gpPrev.gpDown&&down){if(titleCursor<=2)titleCursor=3;}
+
+  // 汎用決定エッジ: A(0) or X/ショット or RT(7)
+  const anyConfirm=b(0)||shootBtnNow||b(7);
+  const anyConfirmEdge=anyConfirm&&!gpPrev.gpConfirm;
+
+  // ── エンディング ──────────────────────────────────────────
+  if(endingScreen){
+    if(anyConfirmEdge||(b(9)&&!gpPrev.start)){gameState='title';endingScreen=false;}
+    gpPrev.gpConfirm=anyConfirm;gpPrev.start=b(9);gpPrev.shoot=shootBtnNow;
+    return;
+  }
+  // ── アチーブメント ────────────────────────────────────────
+  if(achieveScreenActive){
+    if(anyConfirmEdge||(b(1)&&!gpPrev.gpB)){achieveScreenActive=false;achResetConfirm=0;}
+    gpPrev.gpConfirm=anyConfirm;gpPrev.gpB=b(1);gpPrev.shoot=shootBtnNow;
+    return;
+  }
+  // ── 設定画面 ─────────────────────────────────────────────
+  if(gameState==='settings'){
+    if((b(9)||b(1))&&!gpPrev.start){gameState='title';gpRebindTarget=null;}
+    gpPrev.start=b(9);gpPrev.shoot=shootBtnNow;gpPrev.gpConfirm=anyConfirm;
+    return;
+  }
+  // ── ブリーフィング ────────────────────────────────────────
+  if(briefingActive){
+    if(anyConfirmEdge||(b(9)&&!gpPrev.start)){advanceBriefing();}
+    gpPrev.gpConfirm=anyConfirm;gpPrev.start=b(9);gpPrev.shoot=shootBtnNow;
+    return;
+  }
+  // ── タイトル ─────────────────────────────────────────────
+  if(gameState==='title'){
+    const left=b(14)||lx<-DEAD,right=b(15)||lx>DEAD;
+    const up=b(12)||ly<-DEAD,down=b(13)||ly>DEAD;
+    if(left&&!gpPrev.lt){titleCursor=titleCursor<=2?Math.max(0,titleCursor-1):titleCursor===4?3:titleCursor;}
+    if(right&&!gpPrev.rt){titleCursor=titleCursor<=2?Math.min(2,titleCursor+1):titleCursor===3?4:titleCursor;}
+    if(up&&!gpPrev.gpUp&&titleCursor>=3)titleCursor=difficulty;
+    if(down&&!gpPrev.gpDown&&titleCursor<=2)titleCursor=3;
     gpPrev.lt=left;gpPrev.rt=right;gpPrev.gpUp=up;gpPrev.gpDown=down;
-    // カーソル位置を難易度に同期
     if(titleCursor<=2)difficulty=titleCursor;
-    // Xボタン(2)またはAボタン(0)で決定
-    const confirm=b(0)||b(2)||b(7); // A or X or RT
-    if(confirm&&!gpPrev.gpConfirm){
-      if(titleCursor===3){gameState='settings';}
-      else if(titleCursor===4){achieveScreenActive=true;}
-      else{startGame();}
+    if(anyConfirmEdge||(b(9)&&!gpPrev.start)){
+      if(titleCursor===3)gameState='settings';
+      else if(titleCursor===4)achieveScreenActive=true;
+      else startGame();
     }
-    gpPrev.gpConfirm=confirm;
+    if(b(8)&&!gpPrev.sel)gameState='settings';
+    gpPrev.sel=b(8);gpPrev.start=b(9);gpPrev.gpConfirm=anyConfirm;gpPrev.shoot=shootBtnNow;
+    return;
   }
-  // アチーブメント画面: Bボタンで閉じる
-  if(achieveScreenActive&&b(1)&&!gpPrev.gpB){achieveScreenActive=false;achResetConfirm=0;}
-  gpPrev.gpB=b(1);
-  // 強化画面でゲームパッド操作
-  if(upgradeScreen){
-    const opts2=upgradeRound===2?(UPG_TREE.round2[upgradeChoices[0]]||UPG_TREE.round2.offense):UPG_TREE.round1;
-    const maxIdx=opts2.length-1;
-    if(b(14)&&!gpPrev.lt)upgradeHover=Math.max(0,upgradeHover-1);
-    if(b(15)&&!gpPrev.rt)upgradeHover=Math.min(maxIdx,upgradeHover+1);
-    if((b(0)||b(2))&&!gpPrev.gpConfirm)applyUpgrade(upgradeHover);
-  }
-  // ゲームオーバー選択 (A=決定, LR=選択)
+  // ── ゲームオーバー ────────────────────────────────────────
   if(gameOver&&goTimer<=60){
     if(lx<-DEAD)goChoice=0;if(lx>DEAD)goChoice=1;
-    if((b(0)||b(2)||b(7))&&!gpPrev.gpConfirm){goSelected=true;goTimer=1;}
+    if(anyConfirmEdge){goSelected=true;goTimer=1;}
+    gpPrev.gpConfirm=anyConfirm;gpPrev.shoot=shootBtnNow;
+    return;
   }
+  // ── 強化画面 ─────────────────────────────────────────────
+  if(upgradeScreen){
+    const opts2=upgradeRound===2?(UPG_TREE.round2[upgradeChoices[0]]||UPG_TREE.round2.offense):UPG_TREE.round1;
+    const mx=opts2.length-1;
+    if((b(14)||lx<-DEAD)&&!gpPrev.lt)upgradeHover=Math.max(0,upgradeHover-1);
+    if((b(15)||lx>DEAD)&&!gpPrev.rt)upgradeHover=Math.min(mx,upgradeHover+1);
+    if(anyConfirmEdge)applyUpgrade(upgradeHover);
+    gpPrev.lt=(b(14)||lx<-DEAD);gpPrev.rt=(b(15)||lx>DEAD);
+    gpPrev.gpConfirm=anyConfirm;gpPrev.shoot=shootBtnNow;
+    return;
+  }
+  // ── ゲーム中 ─────────────────────────────────────────────
+  K.left=lx<-DEAD||b(14); K.right=lx>DEAD||b(15);
+  const jNow=b(GP_KEYS.jump)||b(12)||ly<-DEAD;
+  if(jNow&&!gpPrev.jump){K.jump=true;jumpEdge=true;}else if(!jNow)K.jump=false;
+  gpPrev.jump=jNow;
+  if(shootEdgeGP){K.shoot=true;shootEdge=true;}else if(!shootBtnNow)K.shoot=false;
+  gpPrev.shoot=shootBtnNow;
+  const subNow=b(GP_KEYS.sub);
+  if(subNow&&!gpPrev.sub){K.sub=true;subEdge=true;}else if(!subNow)K.sub=false;
+  gpPrev.sub=subNow;
+  const barNow=b(GP_KEYS.barrier);
+  if(barNow&&!gpPrev.barrier){K.barrier=true;barrierEdge=true;}else if(!barNow)K.barrier=false;
+  gpPrev.barrier=barNow;
+  if(b(GP_KEYS.unit)&&!gpPrev.lb)cycleRobot();
+  gpPrev.lb=b(GP_KEYS.unit);
+  gpPrev.start=b(9); gpPrev.gpConfirm=anyConfirm;
 }
+
 
 const K={left:false,right:false,jump:false,shoot:false,sub:false,barrier:false};
 let jumpEdge=false,shootEdge=false,subEdge=false;
@@ -1365,7 +1397,10 @@ function checkCollisions(){
   outer:for(let bi=bullets.length-1;bi>=0;bi--){
     const b=bullets[bi];if(b.owner!=='player')continue;
     for(const e of enemies){if(e.dead||e.deathTimer)continue;const ew=EW[e.type],eh=EH[e.type];const slashExt=b.type==='slash'?20:0;if(b.x>=e.x&&b.x<=e.x+ew&&b.y>=e.y-slashExt&&b.y<=e.y+eh+slashExt){e.hp-=b.dmg;spawnSpark(b.x,b.y,'#ff8840',5);sndHit();if(e.hp<=0)killEnemy(e,{turret:200,drone:100,flyer:150,stalker:300}[e.type]);if(b.pierce&&b.pierceCount<2){b.pierceCount++;continue;}bullets.splice(bi,1);continue outer;}}
-    if(boss&&!boss.dead&&!boss.deathSeq){const bSlashExt=b.type==='slash'?20:0;if(b.x>=boss.x&&b.x<=boss.x+boss.w&&b.y>=boss.y-bSlashExt&&b.y<=boss.y+boss.h+bSlashExt){
+    if(boss&&!boss.dead&&!boss.deathSeq){
+      const bSlashExtY=b.type==='slash'?22:0;
+      const bSlashExtX=b.type==='slash'?6:0;
+      if(b.x-bSlashExtX<=boss.x+boss.w&&b.x+bSlashExtX>=boss.x&&b.y>=boss.y-bSlashExtY&&b.y<=boss.y+boss.h+bSlashExtY){
       // 弱点判定
       const bwx=boss.x+(boss.facing===-1?boss.weakRelX:boss.w-boss.weakRelX-boss.weakW);
       const bwy=boss.y+boss.weakRelY;
