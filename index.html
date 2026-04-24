@@ -362,7 +362,7 @@ function pollGamepad(){
 
   // ── エンディング ──────────────────────────────────────────
   if(endingScreen){
-    if(anyConfirmEdge||(b(9)&&!gpPrev.start)){gameState='title';endingScreen=false;}
+    if((anyConfirmEdge||(b(9)&&!gpPrev.start))&&endingTimer<60){gameState='title';endingScreen=false;}
     gpPrev.gpConfirm=anyConfirm;gpPrev.start=b(9);gpPrev.shoot=shootBtnNow;
     return;
   }
@@ -457,7 +457,7 @@ let settingsHoverRow=-1;
 window.addEventListener('keydown',e=>{
   const k=e.key;
   // ── エンディング ─────────────────────────────────────────
-  if(endingScreen&&endingTimer<180){gameState='title';endingScreen=false;return;}
+  if(endingScreen&&endingTimer<60){gameState='title';endingScreen=false;return;}
   // ── ブリーフィング ───────────────────────────────────────
   if(briefingActive){advanceBriefing();e.preventDefault();return;}
   // ── リバインドモード ─────────────────────────────────────
@@ -1388,7 +1388,9 @@ function killEnemy(e,pts){
   shake(2);if(subAmmo<subAmmoMax)subAmmo++;
 }
 function killBoss(){
-  boss.dead=true;boss.deathSeq=60;sndBigExplode();shake(10);
+  boss.dead=true;
+  boss.deathSeq=stage===4?90:60; // Stage4は長めの爆発演出
+  sndBigExplode();shake(10);
   spawnExplosion(boss.x+boss.w/2,boss.y+boss.h/2,true);const bpts=stage===1?5000:stage===2?10000:20000;
   score+=Math.floor(bpts*comboMul);
   if(score>hiScore){hiScore=score;try{localStorage.setItem('cr_hi',hiScore);}catch(e){}}
@@ -1433,14 +1435,27 @@ function checkCollisions(){
   }
   // 剣スイング当たり判定 (parrySwing > 0: MUSHA の近接攻撃範囲)
   if(parrySwing>0&&curRobot===3){
-    const swx=parrySwingDir>0?P.x+PW:P.x-22;
-    const swy=P.y-20;const sww=22,swh=42;
+    // スイング中の剣当たり判定 — 視覚に合わせて縦44px×横28px
+    const swx=parrySwingDir>0?P.x+PW-2:P.x-28;
+    const swy=P.y-24;const sww=30,swh=48;
     for(let bi=bullets.length-1;bi>=0;bi--){
       const b=bullets[bi];
       if(b.owner!=='enemy'&&b.owner!=='boss')continue;
       if(b.x>=swx&&b.x<=swx+sww&&b.y>=swy&&b.y<=swy+swh){
         spawnParryEffect(b.x,b.y);sndParry();bullets.splice(bi,1);
       }
+    }
+    // スイング中は敵にも直接ダメージ (近接攻撃として機能)
+    for(const e of enemies){
+      if(e.dead||e.deathTimer)continue;
+      const ew=EW[e.type],eh=EH[e.type];
+      if(e.x+ew>=swx&&e.x<=swx+sww&&e.y+eh>=swy&&e.y<=swy+swh){
+        if(!e.slashHit){ // 1スイングにつき1回だけダメージ
+          e.hp-=rDmg()*1.5;e.slashHit=parrySwing; // parrySwingの値で管理
+          spawnSpark(swx+sww/2,swy+swh/2,'#e0c030',6);shake(2);
+          if(e.hp<=0)killEnemy(e,{turret:200,drone:100,flyer:150,stalker:300}[e.type]);
+        }
+      } else {e.slashHit=0;} // 範囲外に出たらリセット
     }
   }
   // パリィ中は無敵 (flashTimerガードより優先)
@@ -1456,7 +1471,8 @@ function checkCollisions(){
         bullets.splice(bi,1);
         continue;
       }
-      P.hp=Math.max(0,P.hp-b.dmg);P.flashTimer=28;
+      const incomingDmg=curRobot===3?Math.ceil(b.dmg*1.5):b.dmg; // MUSHA: 装甲が薄い(1.5倍)
+      P.hp=Math.max(0,P.hp-incomingDmg);P.flashTimer=28;
       if(stage===1)achieveStats.damageTakenS1++;
       spawnSpark(b.x,b.y,'#00e8c8',4);
       bullets.splice(bi,1);sndHit();shake(3);
@@ -2979,40 +2995,67 @@ function drawStageIntro(){
 // ── Ending Screen ────────────────────────────────────────────────
 let endScore=0,endKills=0;
 function drawEnding(){
-  const fade=Math.min(1,(300-endingTimer)/60);
-  X.fillStyle=`rgba(4,1,8,${Math.min(.96,fade*1.4)})`;X.fillRect(0,0,GW,GH);
-  if(endingTimer>240)return;
-  const a=Math.min(1,(240-endingTimer)/40);X.globalAlpha=a;X.textAlign='center';
-  // Title glow
-  X.fillStyle='rgba(200,120,255,.18)';X.fillRect(GW/2-140,GH/2-80,280,140);
-  X.strokeStyle='rgba(180,100,255,.35)';X.lineWidth=1;X.strokeRect(GW/2-140,GH/2-80,280,140);
-  X.fillStyle='#c040ff';X.font='bold 18px "Courier New",monospace';
-  X.fillText('OPERATION COMPLETE',GW/2,GH/2-58);
-  X.fillStyle='rgba(220,180,255,.65)';X.font='7px "Courier New",monospace';
-  X.fillText('CHROME REQUIEM — A.D. 2187',GW/2,GH/2-44);
-  X.fillStyle='rgba(180,140,230,.55)';X.font='6px "Courier New",monospace';
-  X.fillText('MANKIND\'S LAST ARMY HAS RECLAIMED THE CORE.',GW/2,GH/2-30);
-  // Score breakdown
-  const lineY=GH/2-10;
-  X.fillStyle='rgba(200,180,255,.45)';X.fillRect(GW/2-110,lineY-8,220,52);
-  X.fillStyle='#c040ff';X.font='7px "Courier New",monospace';
-  X.fillText('FINAL SCORE',GW/2,lineY+4);
-  X.fillStyle='#ffffff';X.font='bold 14px "Courier New",monospace';
-  X.fillText(String(score).padStart(8,'0'),GW/2,lineY+22);
-  // Grade
-  const grade=score>=80000?'S':score>=50000?'A':score>=25000?'B':score>=10000?'C':'D';
-  const gcol={S:'#ffff40',A:'#40ff80',B:'#40d0ff',C:'#ffffff',D:'#888888'}[grade];
-  X.fillStyle=gcol;X.font='bold 22px "Courier New",monospace';
-  X.fillText(grade,GW/2,lineY+42);
-  // Prompt
-  if(endingTimer<180&&(endingTimer&40)<28){
-    X.fillStyle='rgba(180,140,255,.8)';X.font='7px "Courier New",monospace';
-    X.fillText('[ TOUCH / KEY TO RETURN TO TITLE ]',GW/2,GH/2+74);
+  const TOTAL=500; // エンディング総フレーム数
+  const el=TOTAL-endingTimer; // 経過フレーム (0→500)
+  const T=Date.now();
+  // 背景
+  X.fillStyle='rgba(2,1,8,.99)';X.fillRect(0,0,GW,GH);
+  X.strokeStyle='rgba(0,100,80,.03)';X.lineWidth=1;
+  for(let y=0;y<GH;y+=14){X.beginPath();X.moveTo(0,y);X.lineTo(GW,y);X.stroke();}
+  X.fillStyle='rgba(0,0,0,.04)';for(let y=0;y<GH;y+=2)X.fillRect(0,y,GW,1);
+  X.textAlign='center';
+
+  // GAME CLEAR バナー (el>10)
+  if(el>10){
+    const a=Math.min(1,(el-10)/25);X.globalAlpha=a;
+    X.fillStyle='rgba(0,200,140,.12)';X.fillRect(GW/2-170,18,340,20);
+    X.fillStyle='#00e8a8';X.font='bold 12px "Courier New",monospace';
+    X.fillText('─── GAME CLEAR ───',GW/2,33);X.globalAlpha=1;
   }
-  X.globalAlpha=1;X.textAlign='left';
+  // スコア (el>55)
+  if(el>55){
+    const a=Math.min(1,(el-55)/28);X.globalAlpha=a;
+    const grade=score>=120000?'S':score>=80000?'A':score>=40000?'B':score>=15000?'C':'D';
+    const gcol={S:'#ffff40',A:'#40ff80',B:'#40d0ff',C:'#c0c0c0',D:'#808080'}[grade];
+    X.fillStyle='rgba(0,0,0,.5)';X.fillRect(GW/2-100,44,200,34);
+    X.strokeStyle='rgba(0,200,140,.4)';X.lineWidth=1;X.strokeRect(GW/2-100,44,200,34);
+    X.fillStyle='rgba(0,180,130,.55)';X.font='6px "Courier New",monospace';X.fillText('最終スコア',GW/2,58);
+    X.fillStyle='#ffffff';X.font='bold 11px "Courier New",monospace';X.fillText(String(score).padStart(8,'0'),GW/2,72);
+    X.fillStyle=gcol;X.font='bold 14px "Courier New",monospace';X.fillText(grade,GW/2-82,72);
+    X.globalAlpha=1;
+  }
+  // エピローグ (各行が順次フェードイン)
+  const epi=[
+    {t:110,col:'#d0e8d8',txt:'中枢基地コアは沈黙した。'},
+    {t:152,col:'#b0d0c0',txt:'A.D. 2187 ─ 人類の最後の反撃は、成功した。'},
+    {t:198,col:'#b0d0c0',txt:'全ての脅威は去った。'},
+    {t:242,col:'#e0c8a0',txt:'……しかし、'},
+    {t:280,col:'#e0a880',txt:'世界に残った自我を持つロボットは、'},
+    {t:318,col:'#e09060',txt:'今や自分ひとりだけになってしまった。'},
+    {t:354,col:'#c8a880',txt:'荒廃した大地で、機体はひとり空を見上げる。'},
+    {t:388,col:'#b8b8d8',txt:'それがどういう意味を持つのかを、'},
+    {t:416,col:'#c0c0f0',txt:'かつての司令官に問う者は、もういない。'},
+  ];
+  epi.forEach(line=>{
+    if(el<line.t)return;
+    const la=Math.min(1,(el-line.t)/22);
+    const ch=Math.min(line.txt.length,Math.floor((el-line.t)*3.2));
+    X.globalAlpha=la*.9;X.fillStyle=line.col;X.font='8px "Courier New",monospace';
+    X.fillText(line.txt.slice(0,ch),GW/2,86+(epi.indexOf(line))*18);X.globalAlpha=1;
+  });
+  // スキップ促し (el>440 = 7.3秒後から表示)
+  if(el>440){
+    const pa=Math.min(1,(el-440)/20);
+    if((T&800)<500){
+      X.globalAlpha=pa;X.fillStyle='rgba(0,200,150,.75)';X.font='7px "Courier New",monospace';
+      X.fillText('[ タップ / キーでタイトルへ ]',GW/2,GH-14);X.globalAlpha=1;
+    }
+  }
+  X.textAlign='left';
 }
 
 // ================================================================
+//  設定画面 (キーバインド変更)// ================================================================
 //  設定画面 (キーバインド変更)
 // ================================================================
 function drawSettings(){
@@ -3484,7 +3527,7 @@ function startGame(){
 }
 
 // wrap touchstart
-document.getElementById('wrap').addEventListener('touchstart',()=>{if(endingScreen&&endingTimer<180){gameState='title';endingScreen=false;}},{passive:true});
+document.getElementById('wrap').addEventListener('touchstart',()=>{if(endingScreen&&endingTimer<60){gameState='title';endingScreen=false;}},{passive:true});
 
 // ── Main loop ─────────────────────────────────────────────────────
 let prevBoost=0;
@@ -3537,7 +3580,7 @@ function loop(){
           if(stage===1){upgradeRound=1;upgradeScreen=true;stopBGM();if(achieveStats.damageTakenS1===0)unlock('no_damage_s1');}
           else if(stage===2){upgradeRound=2;upgradeScreen=true;stopBGM();}
           else if(stage===3){stage=4;startStage();}
-          else{endingScreen=true;endingTimer=400;stopBGM();sndEnding();unlock('stage4');}
+          else{endingScreen=true;endingTimer=500;stopBGM();sndEnding();unlock('stage4');}
         }}
     } else if(stageClear){
       if(clearTimer>0)clearTimer--;
