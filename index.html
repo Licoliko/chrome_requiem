@@ -141,14 +141,14 @@ const SMAPS=[
    "33333333333333333333333333333333333333333333333333333333333333333333333333333333",
    "00000000000000000000000000000000000000000000000000000000000000000000000000000000",
    "00000000000000000000000000000000000000000000000000000000000000000000000000000000",
-   "00002222000000000000002222000000000000000000000000002222000000000000002222000000",
-   "00000000000000000000000000000000002222000000002222000000000000000000000000000000",
-   "00000000002222000000000000000000000000000000000000000000002222000000000000000000",
-   "00000000000000000000002222000000000000002222000000000000000000000022220000000000",
-   "00000000000000000000000000000000000000000000000000000000000000000000000000000000",
-   "00000000000000000000000000000000000000000000000000000000000000000000000000000000",
-   "00000000000000000000000000000000000000000000000000000000000000000000000000000000",
-   "00000000000000000000000000000000000000000000000000000000000000000000000000000000",
+   "00002222000000002222000000002222000000002222000000002222000000002222000000000000",
+   "00000000000000000000000000000000002222000000002222000000000000000000002222000000",
+   "00002222000000000000002222000000000000000000000000002222000000000000000000000000",
+   "00000000002222000000000000002222000000002222000000000000002222000000000000002222",
+   "00000000000000000000002222000000000000000000000000002222000000000022220000000000",
+   "00002222000000002222000000000000002222000000002222000000000000000000000000000000",
+   "00000000000000000000000000002222000000000000000000002222000000002222000000000000",
+   "00000000002222000000000000000000000000002222000000000000002222000000000000000000",
    "11110000111111110000111111110000111111110000111111110000111111110000111111111111",
    "11111111111111111111111111111111111111111111111111111111111111111111111111111111",
    "11111111111111111111111111111111111111111111111111111111111111111111111111111111",
@@ -187,12 +187,13 @@ const ROBOTS=[
   {id:'LIGHT-01',name:'VANGUARD Mk.I', spd:2.2,jv:-7.8,hp:100,atkCd:12,dmg:8, bspd:5.2,btype:'laser',blife:60,auto:true},
   {id:'HEAVY-01',name:'BREACHER Mk.I', spd:1.6,jv:-6.5,hp:100,atkCd:28,dmg:66,bspd:5.2,btype:'shell',blife:65,auto:false},
   {id:'SCOUT-01',name:'SPECTER Mk.I',  spd:3.0,jv:-8.5,hp:100,atkCd:18,dmg:5, bspd:5.5,btype:'burst',blife:46,auto:true},
-  {id:'MUSHA-01',name:'武者 Mk.I',     spd:1.8,jv:-7.2,hp:130,atkCd:22,dmg:18,bspd:3.2,btype:'kunai',blife:20,auto:false}, // 短射程クナイ
+  {id:'MUSHA-01',name:'武者 Mk.I',     spd:1.8,jv:-7.2,hp:130,atkCd:20,dmg:22,bspd:3.8,btype:'kunai',blife:28,auto:false}, // 剣撃波
 ];
 let curRobot=0;
 const UPG={hpBonus:0,dmgMul:1.0,spdMul:1.0,subSlots:0,
   pierce:false,regen:false,reloadBoost:false,barrierMul:1.0,turboJump:false};
-let upgradeChoices=[];   // Round1で選んだIDを記録
+let upgradeChoices=[];
+let upgradeHover=0; // アップグレード画面のカーソル位置   // Round1で選んだIDを記録
 
 const UPG_TREE={
   round1:[
@@ -271,9 +272,9 @@ const BEAM_STATS=[
 ];
 let beamGauge=0,barrierActive=false,barrierTimer=0;
 // パリィシステム (MUSHA専用)
-let parryActive=false,parryCd=0,parryFlash=0;
+let parryActive=false,parryCd=0,parryFlash=0,parrySwing=0,parrySwingDir=1;
 const PARRY_DURATION=8;   // 無敵フレーム数 (8f ≈ 0.13秒)
-const PARRY_CD=30;        // クールダウン (30f = 0.5秒)
+const PARRY_CD=12;        // クールダウン (12f ≈ 0.2秒)
 // Robot switch animation
 let switchAnim=0,switchAnimCol='#00e8c8';
 let barrierEdge=false;
@@ -305,6 +306,13 @@ function keyLabel(k){const m={'ArrowLeft':'←','ArrowRight':'→','ArrowUp':'�
 
 // ── ゲームパッド状態 ───────────────────────────────────────────
 let gpPrev={jump:false,shoot:false,sub:false,barrier:false,lb:false,start:false,sel:false,lt:false,rt:false,gpUp:false,gpDown:false,gpConfirm:false,gpB:false};
+// ゲームパッドボタン割り当て (ボタンインデックス)
+const DEFAULT_GP={jump:0,shoot:2,sub:3,barrier:1,unit:4};
+let GP_KEYS=loadGPKeys();
+function loadGPKeys(){try{const s=localStorage.getItem('cr_gpkeys');return s?{...DEFAULT_GP,...JSON.parse(s)}:{...DEFAULT_GP};}catch(e){return{...DEFAULT_GP};}}
+function saveGPKeys(){try{localStorage.setItem('cr_gpkeys',JSON.stringify(GP_KEYS));}catch(e){};}
+function gpBtnLabel(n){const m={0:'A',1:'B',2:'X',3:'Y',4:'LB',5:'RB',6:'LT',7:'RT',8:'Back',9:'Start',12:'↑',13:'↓',14:'←',15:'→'};return m[n]??`B${n}`;}
+let gpRebindTarget=null;
 function pollGamepad(){
   if(!navigator.getGamepads)return;
   let pad=null;for(const p of navigator.getGamepads()){if(p){pad=p;break;}}
@@ -317,30 +325,40 @@ function pollGamepad(){
   K.left  = lx<-DEAD||b(14);
   K.right = lx> DEAD||b(15);
   // ジャンプ (A / 十字上)
-  const jNow=b(0)||b(12);if(jNow&&!gpPrev.jump){K.jump=true;jumpEdge=true;}
+  const jNow=b(GP_KEYS.jump)||b(12);if(jNow&&!gpPrev.jump){K.jump=true;jumpEdge=true;}
   else if(!jNow)K.jump=false;
   // 上スティックでもジャンプ
   if(ly<-DEAD&&!K.jump){K.jump=true;jumpEdge=true;}
   else if(ly>-DEAD&&!b(0)&&!b(12)){}
   gpPrev.jump=jNow;
   // ショット (X / RT)
-  const sNow=b(2)||b(7);if(sNow&&!gpPrev.shoot){K.shoot=true;shootEdge=true;}
+  const sNow=b(GP_KEYS.shoot)||b(7);if(sNow&&!gpPrev.shoot){K.shoot=true;shootEdge=true;}
   else if(!sNow)K.shoot=false;gpPrev.shoot=sNow;
   // ミサイル (Y)
-  const subNow=b(3);if(subNow&&!gpPrev.sub){K.sub=true;subEdge=true;}
+  const subNow=b(GP_KEYS.sub);if(subNow&&!gpPrev.sub){K.sub=true;subEdge=true;}
   else if(!subNow)K.sub=false;gpPrev.sub=subNow;
   // バリア (B)
-  const barNow=b(1);if(barNow&&!gpPrev.barrier){K.barrier=true;barrierEdge=true;}
+  const barNow=b(GP_KEYS.barrier);if(barNow&&!gpPrev.barrier){K.barrier=true;barrierEdge=true;}
   else if(!barNow)K.barrier=false;gpPrev.barrier=barNow;
   // ユニット切替 (LB)
-  if(b(4)&&!gpPrev.lb&&gameState==='game'&&!upgradeScreen)cycleRobot();
+  if(b(GP_KEYS.unit)&&!gpPrev.lb&&gameState==='game'&&!upgradeScreen)cycleRobot();
   gpPrev.lb=b(4);
   // スタートボタン
   if(b(9)&&!gpPrev.start){
-    if(achieveScreenActive){achieveScreenActive=false;achResetConfirm=0;}
-    else if(gameState==='settings')gameState='title';
+    if(gpRebindTarget){gpRebindTarget=null;}
+    else if(achieveScreenActive){achieveScreenActive=false;achResetConfirm=0;}
+    else if(gameState==='settings'){gameState='title';}
     else if(gameState==='title')startGame();
     else if(briefingActive)advanceBriefing();
+  }
+  // GPリバインド待ち受け
+  if(gpRebindTarget&&gameState==='settings'){
+    for(let i=0;i<pad.buttons.length;i++){
+      if(pad.buttons[i]?.pressed&&!gpPrev['_btn'+i]){
+        if(i!==9){GP_KEYS[gpRebindTarget]=i;saveGPKeys();gpRebindTarget=null;}
+      }
+      gpPrev['_btn'+i]=pad.buttons[i]?.pressed;
+    }
   }
   gpPrev.start=b(9);
   // セレクト → 設定画面
@@ -375,10 +393,18 @@ function pollGamepad(){
   // アチーブメント画面: Bボタンで閉じる
   if(achieveScreenActive&&b(1)&&!gpPrev.gpB){achieveScreenActive=false;achResetConfirm=0;}
   gpPrev.gpB=b(1);
+  // 強化画面でゲームパッド操作
+  if(upgradeScreen){
+    const opts2=upgradeRound===2?(UPG_TREE.round2[upgradeChoices[0]]||UPG_TREE.round2.offense):UPG_TREE.round1;
+    const maxIdx=opts2.length-1;
+    if(b(14)&&!gpPrev.lt)upgradeHover=Math.max(0,upgradeHover-1);
+    if(b(15)&&!gpPrev.rt)upgradeHover=Math.min(maxIdx,upgradeHover+1);
+    if((b(0)||b(2))&&!gpPrev.gpConfirm)applyUpgrade(upgradeHover);
+  }
   // ゲームオーバー選択 (A=決定, LR=選択)
   if(gameOver&&goTimer<=60){
     if(lx<-DEAD)goChoice=0;if(lx>DEAD)goChoice=1;
-    if((b(0)||b(2))&&!gpPrev.gpConfirm){goSelected=true;goTimer=1;}
+    if((b(0)||b(2)||b(7))&&!gpPrev.gpConfirm){goSelected=true;goTimer=1;}
   }
 }
 
@@ -443,7 +469,11 @@ window.addEventListener('keydown',e=>{
   if((k===KEYS.barrier)&&!K.barrier){K.barrier=true;barrierEdge=true;}
   if(k==='1'||k==='2'||k==='3'||k==='4'){curRobot=+k-1;P.maxHp=rHp();P.hp=Math.min(P.hp,P.maxHp);updUnitBtn();sndSwitch();}
   if([' ','ArrowUp','ArrowDown',KEYS.jump].includes(k))e.preventDefault();
-  if(upgradeScreen){if(k==='1')applyUpgrade(0);if(k==='2')applyUpgrade(1);if(k==='3')applyUpgrade(2);}
+  if(upgradeScreen){
+    if(k==='1')applyUpgrade(0);if(k==='2')applyUpgrade(1);if(k==='3')applyUpgrade(2);
+    // ショットボタンでもカーソル位置を決定
+    if((k===KEYS.shoot||k==='z'||k==='Z'||k==='x'||k==='X'||k===' ')&&typeof upgradeHover!=='undefined')applyUpgrade(upgradeHover);
+  }
 });
 window.addEventListener('keyup',e=>{
   const k=e.key;
@@ -543,17 +573,16 @@ CV.addEventListener('click',e=>{
   // 設定画面クリック
   if(gameState==='settings'){
     const c=cvCoord(e.clientX,e.clientY);
-    // リセットボタン
     if(c.x>=14&&c.x<=94&&c.y>=GH-22&&c.y<=GH-8){
-      Object.assign(KEYS,DEFAULT_KEYS);saveKeys();rebindTarget=null;return;
+      Object.assign(KEYS,DEFAULT_KEYS);Object.assign(GP_KEYS,DEFAULT_GP);saveKeys();saveGPKeys();rebindTarget=null;gpRebindTarget=null;return;
     }
-    // 閉じるボタン
-    if(c.x>=GW-94&&c.x<=GW-14&&c.y>=GH-22&&c.y<=GH-8){gameState='title';rebindTarget=null;return;}
-    // アクション行クリック
-    SETTING_ACTIONS.forEach((a,i)=>{
-      const ry=44+i*16;
-      if(c.y>=ry&&c.y<=ry+15){rebindTarget=(rebindTarget===a.id?null:a.id);}
-    });
+    if(c.x>=GW-94&&c.x<=GW-14&&c.y>=GH-22&&c.y<=GH-8){gameState='title';rebindTarget=null;gpRebindTarget=null;return;}
+    SETTING_ACTIONS.forEach((a,i)=>{const ry=44+i*16;if(c.y>=ry&&c.y<=ry+15)rebindTarget=(rebindTarget===a.id?null:a.id);});
+    // GPボタン行クリック
+    const ROW_Y_GP=44+SETTING_ACTIONS.length*16+6+16;
+    const GP_ACTIONS2=[{id:'jump'},{id:'shoot'},{id:'sub'},{id:'barrier'},{id:'unit'}];
+    const gpColW2=(GW-20)/GP_ACTIONS2.length;
+    GP_ACTIONS2.forEach((ga,i)=>{const gx=10+i*gpColW2,gy=ROW_Y_GP;if(c.x>=gx&&c.x<=gx+gpColW2-3&&c.y>=gy&&c.y<=gy+26)gpRebindTarget=(gpRebindTarget===ga.id?null:ga.id);});
     return;
   }
   if(!upgradeScreen)return;const c2=cvCoord(e.clientX,e.clientY);tapUpgrade(c2.x,c2.y);
@@ -644,7 +673,8 @@ function updateBullets(){
     b.x+=b.vx;b.y+=b.vy;b.life--;
     {
       const btc=Math.floor(b.x/TS),btr=Math.floor(b.y/TS);
-      if(solid(btc,btr)){
+      if(b.type==='slash'){/* 壁貫通 */}
+      else if(solid(btc,btr)){
         if(tileAt(btc,btr)===3){damageDebris(btc,btr,1);}
         if(b.type==='mortar'){spawnExplosion(b.x,b.y,true);sndBigExplode();shake(6);spawnBullet(b.x,b.y,-2.8,-.6,'boss',14,'enemy',52);spawnBullet(b.x,b.y,2.8,-.6,'boss',14,'enemy',52);
           // モルタル爆風で周囲破壊
@@ -921,6 +951,8 @@ function activateBarrier(){
     parryActive=true;
     parryFlash=PARRY_DURATION;
     parryCd=PARRY_CD;
+    parrySwing=12; // 剣スイングエフェクト12フレーム
+    parrySwingDir=P.facing;
     sndParry();
     return;
   }
@@ -1062,12 +1094,12 @@ const SSETS=[
    {t:'turret',x:24,y:12},{t:'flyer',x:34,y:5},{t:'drone',x:30,y:12},{t:'stalker',x:42,y:12},
    {t:'flyer',x:46,y:7},{t:'turret',x:52,y:12},{t:'drone',x:48,y:12},{t:'stalker',x:64,y:12},
    {t:'flyer',x:68,y:5},{t:'turret',x:66,y:12}],
-  // Stage 3 — all types, max density
-  [{t:'stalker',x:4,y:12},{t:'flyer',x:8,y:6},{t:'stalker',x:14,y:12},{t:'drone',x:10,y:12},
-   {t:'turret',x:18,y:12},{t:'flyer',x:22,y:5},{t:'stalker',x:26,y:12},{t:'drone',x:30,y:12},
-   {t:'flyer',x:34,y:7},{t:'stalker',x:38,y:12},{t:'turret',x:42,y:12},{t:'drone',x:46,y:12},
-   {t:'stalker',x:50,y:12},{t:'flyer',x:54,y:6},{t:'turret',x:58,y:12},{t:'stalker',x:63,y:12},
-   {t:'flyer',x:68,y:5},{t:'drone',x:65,y:12}],
+  // Stage 3 — all types, max density (開始地点から十分離す x>=16)
+  [{t:'flyer',x:16,y:6},{t:'stalker',x:20,y:12},{t:'drone',x:24,y:12},
+   {t:'turret',x:28,y:12},{t:'flyer',x:32,y:5},{t:'stalker',x:36,y:12},{t:'drone',x:40,y:12},
+   {t:'flyer',x:44,y:7},{t:'stalker',x:48,y:12},{t:'turret',x:52,y:12},{t:'drone',x:56,y:12},
+   {t:'stalker',x:60,y:12},{t:'flyer',x:64,y:6},{t:'turret',x:68,y:12},{t:'stalker',x:72,y:12},
+   {t:'flyer',x:76,y:5},{t:'drone',x:74,y:12}],
   // Stage 4 — 基地内部・全種大量配置 (スタート地点から離す)
   [{t:'drone',x:20,y:11},{t:'flyer',x:24,y:5},{t:'stalker',x:28,y:12},{t:'turret',x:32,y:12},
    {t:'flyer',x:36,y:4},{t:'drone',x:40,y:11},{t:'stalker',x:44,y:12},{t:'turret',x:48,y:12},
@@ -1332,8 +1364,8 @@ function killBoss(){
 function checkCollisions(){
   outer:for(let bi=bullets.length-1;bi>=0;bi--){
     const b=bullets[bi];if(b.owner!=='player')continue;
-    for(const e of enemies){if(e.dead||e.deathTimer)continue;const ew=EW[e.type],eh=EH[e.type];if(b.x>=e.x&&b.x<=e.x+ew&&b.y>=e.y&&b.y<=e.y+eh){e.hp-=b.dmg;spawnSpark(b.x,b.y,'#ff8840',5);sndHit();if(e.hp<=0)killEnemy(e,{turret:200,drone:100,flyer:150,stalker:300}[e.type]);if(b.pierce&&b.pierceCount<2){b.pierceCount++;continue;}bullets.splice(bi,1);continue outer;}}
-    if(boss&&!boss.dead&&!boss.deathSeq){if(b.x>=boss.x&&b.x<=boss.x+boss.w&&b.y>=boss.y&&b.y<=boss.y+boss.h){
+    for(const e of enemies){if(e.dead||e.deathTimer)continue;const ew=EW[e.type],eh=EH[e.type];const slashExt=b.type==='slash'?20:0;if(b.x>=e.x&&b.x<=e.x+ew&&b.y>=e.y-slashExt&&b.y<=e.y+eh+slashExt){e.hp-=b.dmg;spawnSpark(b.x,b.y,'#ff8840',5);sndHit();if(e.hp<=0)killEnemy(e,{turret:200,drone:100,flyer:150,stalker:300}[e.type]);if(b.pierce&&b.pierceCount<2){b.pierceCount++;continue;}bullets.splice(bi,1);continue outer;}}
+    if(boss&&!boss.dead&&!boss.deathSeq){const bSlashExt=b.type==='slash'?20:0;if(b.x>=boss.x&&b.x<=boss.x+boss.w&&b.y>=boss.y-bSlashExt&&b.y<=boss.y+boss.h+bSlashExt){
       // 弱点判定
       const bwx=boss.x+(boss.facing===-1?boss.weakRelX:boss.w-boss.weakRelX-boss.weakW);
       const bwy=boss.y+boss.weakRelY;
@@ -1362,6 +1394,18 @@ function checkCollisions(){
       const b=bullets[bi];if(b.owner!=='enemy'&&b.owner!=='boss')continue;
       const dx=b.x-(P.x+PW/2),dy=b.y-(P.y+PH/2);
       if(dx*dx+dy*dy<28*28){spawnSpark(b.x,b.y,bs.col,4,1.2);bullets.splice(bi,1);}
+    }
+  }
+  // 剣スイング当たり判定 (parrySwing > 0: MUSHA の近接攻撃範囲)
+  if(parrySwing>0&&curRobot===3){
+    const swx=parrySwingDir>0?P.x+PW:P.x-22;
+    const swy=P.y-20;const sww=22,swh=42;
+    for(let bi=bullets.length-1;bi>=0;bi--){
+      const b=bullets[bi];
+      if(b.owner!=='enemy'&&b.owner!=='boss')continue;
+      if(b.x>=swx&&b.x<=swx+sww&&b.y>=swy&&b.y<=swy+swh){
+        spawnParryEffect(b.x,b.y);sndParry();bullets.splice(bi,1);
+      }
     }
   }
   // パリィ中は無敵 (flashTimerガードより優先)
@@ -1454,6 +1498,7 @@ function physicsStep(){
   // パリィ処理
   if(parryActive){parryFlash--;if(parryFlash<=0){parryActive=false;}}
   if(parryCd>0)parryCd--;
+  if(parrySwing>0)parrySwing--;
   // 修復回路
   if(UPG.regen&&P.onGround&&!gameOver&&P.hp<P.maxHp){P.regenTick=(P.regenTick||0)+1;if(P.regenTick>=150){P.hp=Math.min(P.maxHp,P.hp+1);P.regenTick=0;}}
   // 高速リロード
@@ -2128,11 +2173,33 @@ function drawMusha(sx,sy){
   r(rlx,rly+3,4,2,DK);r(rlx,rly+4,5,1,GD);
 
   X.restore();
+  // 剣スイングエフェクト (縦斬り・6フレーム持続)
+  if(parrySwing>0){
+    const swAlpha=parrySwing/12;
+    const swDir=parrySwingDir;
+    const swx=sx+(swDir>0?PW+1:-18);
+    const swy=sy-22;
+    // 縦斬り光の弧
+    X.globalAlpha=swAlpha*.85;
+    // メイン斬撃線（縦）
+    X.strokeStyle='#ffe060';X.lineWidth=3;
+    X.beginPath();X.moveTo(swx+(swDir>0?0:16),swy);X.lineTo(swx+(swDir>0?8:8),swy+42);X.stroke();
+    // 太い光帯
+    X.fillStyle=`rgba(255,220,60,${swAlpha*.5})`;
+    X.fillRect(swx+(swDir>0?-2:-4),swy,14,44);
+    // 白い中心線
+    X.strokeStyle='#ffffff';X.lineWidth=1.5;
+    X.beginPath();X.moveTo(swx+(swDir>0?3:10),swy+2);X.lineTo(swx+(swDir>0?8:5),swy+40);X.stroke();
+    // 端の残光
+    X.strokeStyle='rgba(255,200,40,.5)';X.lineWidth=1;
+    X.beginPath();X.moveTo(swx+(swDir>0?-1:15),swy+4);X.lineTo(swx+(swDir>0?5:11),swy+38);X.stroke();
+    X.globalAlpha=1;
+  }
   // パリィクールダウン表示（点滅）
-  if(parryCd>0&&!parryActive){
+  if(parryCd>0&&!parryActive&&parrySwing===0){
     const cdRatio=parryCd/PARRY_CD;
-    X.globalAlpha=.7+Math.sin(Date.now()*.04)*.3;
-    X.strokeStyle=`rgba(224,192,48,${1-cdRatio})`;X.lineWidth=1;
+    X.globalAlpha=.5+Math.sin(Date.now()*.08)*.3;
+    X.strokeStyle=`rgba(224,192,48,${1-cdRatio*.5})`;X.lineWidth=1;
     X.strokeRect(Math.floor(sx-1),Math.floor(sy-1),16,27);
     X.globalAlpha=1;
   }
@@ -2144,14 +2211,20 @@ function drawBullet(b){
   if(b.type==='laser'){X.fillStyle='#00f0e0';X.fillRect(sx-4,sy-1,8,2);X.globalAlpha=.24;X.fillStyle='#00f8f0';X.fillRect(sx-5,sy-2,10,4);X.globalAlpha=1;}
   else if(b.type==='shell'){X.fillStyle='#e09020';X.fillRect(sx-5,sy-2,10,4);X.fillStyle='#ffe860';X.fillRect(sx-4,sy-1,7,2);}
   else if(b.type==='burst'){X.fillStyle='#20d0f0';X.fillRect(sx-3,sy-1,6,2);}
-  else if(b.type==='kunai'){
-    // クナイ: 回転する細い刃
-    const ang=Math.atan2(b.vy,b.vx);
-    X.save();X.translate(sx,sy);X.rotate(ang);
-    X.fillStyle='#c0c0e0';X.fillRect(-5,-1,9,2);
-    X.fillStyle='#ffffff';X.fillRect(-5,-1,3,2); // 刃先
-    X.fillStyle='#806040';X.fillRect(3,-1,3,2);  // 柄
-    X.restore();
+  else if(b.type==='kunai'||b.type==='slash'){
+    // 縦斬撃波: 縦に長い光の刃
+    const lifeRatio=b.life/(b.type==='slash'?28:20);
+    X.globalAlpha=Math.min(1,lifeRatio+0.2);
+    // 外側の光帯
+    X.fillStyle=`rgba(255,220,80,${lifeRatio*.6})`;X.fillRect(sx-4,sy-18,10,38);
+    // 中心の白い刃
+    X.fillStyle='rgba(255,255,255,.9)';X.fillRect(sx-1,sy-20,4,42);
+    // 刃先の輝き
+    X.fillStyle='#ffe060';X.fillRect(sx-2,sy-22,6,4);X.fillRect(sx-2,sy+18,6,4);
+    // 縦線の光
+    X.strokeStyle='#ffe060';X.lineWidth=1;
+    X.beginPath();X.moveTo(sx+1,sy-20);X.lineTo(sx+1,sy+20);X.stroke();
+    X.globalAlpha=1;
   }
   else if(b.type==='boss'){X.fillStyle='#dd2080';X.fillRect(sx-5,sy-3,10,6);X.fillStyle='#ff80c0';X.fillRect(sx-3,sy-1,6,2);X.globalAlpha=.26;X.fillStyle='#ff40a0';X.fillRect(sx-7,sy-4,14,8);X.globalAlpha=1;}
   else if(b.type==='mortar'){X.fillStyle='#cc2040';X.fillRect(sx-5,sy-5,10,10);X.fillStyle='#ff6060';X.fillRect(sx-3,sy-3,6,6);X.globalAlpha=.28;X.fillStyle='#ff4060';X.fillRect(sx-8,sy-8,16,16);X.globalAlpha=1;}
@@ -2959,14 +3032,27 @@ function drawSettings(){
     X.fillText(a.gp,COL[2],ry+11);
   });
 
-  // ゲームパッド追加情報
-  const gpY=ROW_Y+SETTING_ACTIONS.length*ROW_H+4;
-  X.fillStyle='rgba(40,20,80,.7)';X.fillRect(8,gpY,GW-16,26);
-  X.strokeStyle='rgba(80,50,160,.35)';X.lineWidth=1;X.strokeRect(8,gpY,GW-16,26);
-  X.fillStyle='rgba(140,110,220,.6)';X.font='bold 6px "Courier New",monospace';
-  X.fillText('ゲームパッド固定割り当て:  LBボタン → ユニット切替   Startボタン → 決定/次へ',12,gpY+10);
-  X.fillStyle='rgba(120,90,180,.5)';X.font='6px "Courier New",monospace';
-  X.fillText('ユニット切替: LBボタン  |  難易度選択: LT / RT  |  ゲームパッドは自動検出',12,gpY+20);
+  // ゲームパッド割り当てセクション
+  const gpY=ROW_Y+SETTING_ACTIONS.length*ROW_H+6;
+  X.fillStyle='rgba(40,20,80,.7)';X.fillRect(8,gpY,GW-16,50);
+  X.strokeStyle='rgba(80,50,160,.4)';X.lineWidth=1;X.strokeRect(8,gpY,GW-16,50);
+  X.fillStyle='rgba(180,140,255,.7)';X.font='bold 6px "Courier New",monospace';
+  X.fillText('🎮 ゲームパッドボタン割り当て (クリックで変更)',14,gpY+10);
+  X.strokeStyle='rgba(80,50,160,.3)';X.beginPath();X.moveTo(10,gpY+13);X.lineTo(GW-10,gpY+13);X.stroke();
+  const GP_ACTIONS=[{id:'jump',label:'ジャンプ'},{id:'shoot',label:'ショット'},{id:'sub',label:'ミサイル'},{id:'barrier',label:'バリア/パリィ'},{id:'unit',label:'ユニット切替'}];
+  const gpColW=(GW-20)/GP_ACTIONS.length;
+  GP_ACTIONS.forEach((ga,i)=>{
+    const gx=10+i*gpColW,gy=gpY+16,gw2=gpColW-3;
+    const isReb=gpRebindTarget===ga.id;
+    X.fillStyle=isReb?'rgba(120,80,255,.22)':'rgba(20,10,40,.5)';X.fillRect(gx,gy,gw2,26);
+    X.strokeStyle=isReb?'rgba(120,80,255,.8)':'rgba(80,50,160,.35)';X.lineWidth=1;X.strokeRect(gx,gy,gw2,26);
+    X.fillStyle='rgba(160,130,220,.65)';X.font='5px "Courier New",monospace';X.textAlign='center';
+    X.fillText(ga.label,gx+gw2/2,gy+9);
+    const curBtn=GP_KEYS[ga.id]??0;
+    X.fillStyle=isReb?'#c0a0ff':'#e0d0ff';X.font='bold 7px "Courier New",monospace';
+    X.fillText(isReb?'押してください':gpBtnLabel(curBtn),gx+gw2/2,gy+20);
+    X.textAlign='left';
+  });
 
   // ボタン: リセット
   const btnY=GH-22;
